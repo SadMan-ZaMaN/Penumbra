@@ -15,13 +15,26 @@ Reference screenshots go in `reference/`.
 
 Found on the first real run (2026-10-29). We fix these one at a time, and each fix gets tested before the next one starts.
 
-- [ ] **Color doesn't follow the song.** A song played on YouTube, but the glow color never changed.
-  *Rebuilt, needs testing with real music.* Music (Spotify, YouTube Music) now uses the cover's biggest color, and videos (YouTube) use the screen's colors.
-  Found on 2026-10-29: the whitish glow came from Chrome **Incognito**, which hides what's playing and sends its Incognito icon as the "album art". That now falls back to the screen's colors. Not yet tested with sound playing.
+## Round 3 (2026-10-30): matching Lumn's video (`reference/Video-instagram.mp4`)
+
+What the video shows: a thin, solid, fully saturated line; stretches of light that grow, travel along the edge and fade, with full darkness in between; the line gets a little thicker as a stream passes; only a small halo. The dropdown menu and the star-and-lines lyrics in the video are from **Verci**, a separate lyrics app, not Lumn.
+
+- [ ] **Streams, not bars.** *Done, needs your judgment.* Up to 8 streams at once. Loud music brings more of them, faster and brighter. Beats start new ones.
+- [ ] **Less space when it's loud.** *Done, needs your judgment.* Loudness changes brightness and motion only. The line and halo keep their size.
+- [ ] **Solid, bright colors (not dim or glassy).** *Done, needs your judgment.* The line is drawn fully opaque, and colors are pushed to full brightness with at least 80% saturation (the yellow cover now gives `#ffe633`, not a pastel).
+- [x] **Control panel that isn't distracting.** It's now a compact pop-up above the tray icon that hides when you click anywhere else. No taskbar button, no title bar.
+- [x] **Color doesn't follow the song.** Tested live on 2026-10-30: an Incognito Chrome tab playing music gave `video->screen` with yellow `#fff033` / lime `#c3ff52` taken from the screen.
+  The earlier whitish glow came from Chrome **Incognito**, which hides what's playing and sends its Incognito icon as the "album art". That now falls back to the screen's colors.
+
+## Round 2 (2026-10-29)
+
 - [ ] **No glow when silent.** *Done, needs testing.* The glow fades out after 1.5 s of silence and comes back with any sound. "Glow when nothing is playing" in the panel brings back the dim idle glow.
-- [ ] **Wavier, moving light.** *Done, needs your judgment.* Ripples about 350–1000 px long now flow along the edges in both directions, and the lights move twice as fast. The new Waviness slider sets how strong the ripples are.
-- [ ] **Colors too dim.** *Done, needs your judgment.* Brightness defaults to 100%, the glow is stronger, and the rim is less white.
-- [x] **Settings panel.** Left-click the tray icon: colors (automatic / album art / screen / my colors, swatches, presets), sliders, corners, motion, switches. It can be minimized to the taskbar.
+- [x] **Wavier, moving light.** Replaced in round 3 by streams with rippling thickness.
+- [x] **Colors too dim.** Replaced in round 3 by solid colors.
+- [x] **Settings panel.** Left-click the tray icon: colors (automatic / album art / screen / mine, swatches, presets), sliders, corners, motion, switches.
+
+## Round 1 (2026-10-29)
+
 - [x] **Glow looks boxy.** The edges looked like squares or boxes, not a soft light.
   Replaced the four rectangles with one GPU-drawn glow: a crisp rim, a soft wavy bloom, moving lights, and sparks on beats. Corners are square by default and the light reaches right into them. Rounded is in the tray menu.
 - [ ] **Colors look off.** Even apart from the YouTube problem, the colors don't look good.

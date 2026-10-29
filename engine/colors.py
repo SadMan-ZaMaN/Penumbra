@@ -23,11 +23,9 @@ def _from_hex(h):
 
 
 def _glowify(rgb):
-    """Keep the hue, but make it bright and saturated enough to glow."""
-    h, l, s = colorsys.rgb_to_hls(*(c / 255.0 for c in rgb))
-    s = min(1.0, max(s, 0.7) * 1.1)
-    l = min(0.68, max(l, 0.55))
-    return tuple(c * 255 for c in colorsys.hls_to_rgb(h, l, s))
+    """Keep the hue, but make it a solid, fully bright color (no pastel / washed-out look)."""
+    h, s, v = colorsys.rgb_to_hsv(*(c / 255.0 for c in rgb))
+    return tuple(c * 255 for c in colorsys.hsv_to_rgb(h, max(s, 0.8), 1.0))
 
 
 def _hue_chroma(px):
@@ -71,8 +69,8 @@ def pick_colors(pixels, count=2):
             blocked[(k + j) % HUE_BINS] = True
 
     while len(chosen) < count:          # single-hue image: a neighbouring shade of the same hue
-        h, l, s = colorsys.rgb_to_hls(*(c / 255.0 for c in chosen[0]))
-        chosen.append(tuple(c * 255 for c in colorsys.hls_to_rgb((h + 0.07) % 1, min(0.72, l + 0.08), s)))
+        h, s, v = colorsys.rgb_to_hsv(*(c / 255.0 for c in chosen[0]))
+        chosen.append(tuple(c * 255 for c in colorsys.hsv_to_rgb((h + 0.07) % 1, s * 0.85, v)))
     return [_to_hex(c) for c in chosen]
 
 

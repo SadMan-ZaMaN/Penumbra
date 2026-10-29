@@ -9,8 +9,9 @@ using System.Windows.Threading;
 
 namespace LumnWin
 {
-    /// <summary>The settings window (left-click the tray icon). Changes show on screen immediately;
-    /// saving to settings.json is batched so dragging a slider doesn't write the file 60 times.</summary>
+    /// <summary>The settings pop-up (left-click the tray icon). It sits above the tray and hides as soon
+    /// as you click anywhere else. Changes show on screen immediately; saving to settings.json is
+    /// batched so dragging a slider doesn't write the file 60 times.</summary>
     public partial class ControlPanel : Window
     {
         /// <summary>Set before quitting so closing the window really closes it (normally it just hides).</summary>
@@ -28,7 +29,8 @@ namespace LumnWin
         readonly GlowController _glow;
         readonly EngineLink _link;
         readonly DispatcherTimer _save, _live;
-        bool _loading, _placed;
+        bool _loading, _picking;
+        long _hiddenAt;
 
         public ControlPanel(Settings s, GlowController glow, EngineLink link, Action changed, Action quit)
         {
@@ -65,7 +67,7 @@ namespace LumnWin
             {
                 var btn = new Button
                 {
-                    Style = (Style)FindResource("Swatch"), Width = 27, Height = 20, Margin = new Thickness(0, 0, 5, 6),
+                    Style = (Style)FindResource("Swatch"), Width = 24, Height = 18, Margin = new Thickness(0, 0, 4, 4),
                     Background = Gradient(a, b), ToolTip = name,
                 };
                 btn.Click += (_, _) => UseColors(a, b);
@@ -73,17 +75,29 @@ namespace LumnWin
             }
 
             Closing += (_, e) => { if (!Quitting) { e.Cancel = true; Hide(); } };
+            Deactivated += (_, _) =>          // clicked somewhere else: tuck away
+            {
+                if (_picking || !IsVisible) return;
+                Hide();
+                _hiddenAt = Environment.TickCount64;
+            };
+            KeyDown += (_, e) => { if (e.Key == System.Windows.Input.Key.Escape) Hide(); };
             IsVisibleChanged += (_, _) => { if (IsVisible) { Load(); UpdateLive(); _live.Start(); } else _live.Stop(); };
-            SourceInitialized += (_, _) => Native.UseDarkTitleBar(new WindowInteropHelper(this).Handle);
-            Loaded += (_, _) => PlaceNearTray();
+            SourceInitialized += (_, _) => Native.UseRoundedCorners(new WindowInteropHelper(this).Handle);
             Icon = Imaging.CreateBitmapSourceFromHIcon(Tray.MakeIcon().Handle, Int32Rect.Empty, BitmapSizeOptions.FromEmptyOptions());
         }
 
-        /// <summary>Show (or bring back from minimized) and focus.</summary>
+        /// <summary>Pop up above the tray, or tuck away if it's already open.</summary>
         public void Open()
         {
+            // clicking the tray icon while open first hides the pop-up (it loses focus): don't reopen it
+            if (Environment.TickCount64 - _hiddenAt < 300) return;
+            if (IsVisible) { Hide(); return; }
             Show();
-            if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal;
+            UpdateLayout();
+            var wa = SystemParameters.WorkArea;
+            Left = wa.Right - ActualWidth - 12;
+            Top = Math.Max(wa.Top + 12, wa.Bottom - ActualHeight - 12);
             Activate();
         }
 
@@ -134,7 +148,11 @@ namespace LumnWin
                 FullOpen = true,
                 Color = System.Drawing.Color.FromArgb(cur.R, cur.G, cur.B),
             };
-            if (dlg.ShowDialog() != System.Windows.Forms.DialogResult.OK) return;
+            _picking = true;                  // the dialog takes focus; don't hide the pop-up for that
+            var result = dlg.ShowDialog();
+            _picking = false;
+            Activate();
+            if (result != System.Windows.Forms.DialogResult.OK) return;
             string hex = $"#{dlg.Color.R:x2}{dlg.Color.G:x2}{dlg.Color.B:x2}";
             UseColors(primary ? hex : _s.Primary, primary ? _s.Secondary : hex);
         }
@@ -160,15 +178,6 @@ namespace LumnWin
             else if (!sound && !_s.IdleGlow && _s.Mode == GlowMode.MusicSync) from += " · glow waits for sound";
             ColorInfo.Text = from;
             LiveColors.Background = new LinearGradientBrush(_glow.Primary, _glow.Secondary, 0);
-        }
-
-        void PlaceNearTray()
-        {
-            if (_placed) return;
-            _placed = true;
-            var wa = SystemParameters.WorkArea;
-            Left = wa.Right - ActualWidth - 12;
-            Top = Math.Max(wa.Top + 12, wa.Bottom - ActualHeight - 12);
         }
 
         static Brush Gradient(string a, string b) =>

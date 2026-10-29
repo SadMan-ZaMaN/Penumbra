@@ -1,10 +1,10 @@
 <Window x:Class="LumnWin.ControlPanel"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Penumbra" Width="400" SizeToContent="Height" ResizeMode="CanMinimize"
-        WindowStartupLocation="Manual" ShowInTaskbar="True"
-        Background="#15151b" Foreground="#f0f0f5"
-        FontFamily="Segoe UI Variable Text, Segoe UI" FontSize="13">
+        Title="Penumbra" Width="340" SizeToContent="Height" ResizeMode="NoResize"
+        WindowStyle="None" WindowStartupLocation="Manual" ShowInTaskbar="False" Topmost="True"
+        Background="#15151b" Foreground="#f0f0f5" BorderBrush="#33ffffff" BorderThickness="1"
+        FontFamily="Segoe UI Variable Text, Segoe UI" FontSize="12.5">
 
     <Window.Resources>
         <SolidColorBrush x:Key="Accent" Color="#8b7bff"/>
@@ -21,9 +21,9 @@
 
         <Style x:Key="CardBorder" TargetType="Border">
             <Setter Property="Background" Value="{StaticResource Card}"/>
-            <Setter Property="CornerRadius" Value="12"/>
-            <Setter Property="Padding" Value="14,12"/>
-            <Setter Property="Margin" Value="0,0,0,12"/>
+            <Setter Property="CornerRadius" Value="10"/>
+            <Setter Property="Padding" Value="12,10"/>
+            <Setter Property="Margin" Value="0,0,0,10"/>
         </Style>
 
         <!-- pill-shaped choice buttons -->
@@ -33,7 +33,7 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="RadioButton">
-                        <Border x:Name="b" CornerRadius="8" Background="{StaticResource Control}" Padding="10,6" Margin="0,0,6,6">
+                        <Border x:Name="b" CornerRadius="7" Background="{StaticResource Control}" Padding="9,5" Margin="0,0,5,5">
                             <ContentPresenter HorizontalAlignment="Center"/>
                         </Border>
                         <ControlTemplate.Triggers>
@@ -53,7 +53,7 @@
         <Style x:Key="Switch" TargetType="CheckBox">
             <Setter Property="Foreground" Value="#f0f0f5"/>
             <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Margin" Value="0,4"/>
+            <Setter Property="Margin" Value="0,3"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="CheckBox">
@@ -146,16 +146,16 @@
     </Window.Resources>
 
     <ScrollViewer VerticalScrollBarVisibility="Auto">
-    <StackPanel Margin="16,14,16,16">
+    <StackPanel Margin="14,12,14,12">
 
         <!-- header: name, on/off, now playing -->
-        <Grid Margin="2,0,0,12">
+        <Grid Margin="2,0,0,10">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
             <StackPanel>
-                <TextBlock Text="Penumbra" FontSize="20" FontWeight="SemiBold"/>
+                <TextBlock Text="Penumbra" FontSize="17" FontWeight="SemiBold"/>
                 <TextBlock x:Name="NowPlaying" Text="Listening…" Foreground="{StaticResource Subtle}" TextTrimming="CharacterEllipsis" Margin="0,2,0,0"/>
             </StackPanel>
             <CheckBox x:Name="Enabled" Grid.Column="1" Style="{StaticResource Switch}" VerticalAlignment="Top" Margin="0,4,0,0"/>
@@ -175,17 +175,17 @@
                 </Grid>
 
                 <WrapPanel x:Name="SourceChoices">
-                    <RadioButton Style="{StaticResource Seg}" GroupName="src" Tag="Auto" Content="Automatic" ToolTip="Album art for music, the screen for videos"/>
+                    <RadioButton Style="{StaticResource Seg}" GroupName="src" Tag="Auto" Content="Auto" ToolTip="Album art for music, the screen for videos"/>
                     <RadioButton Style="{StaticResource Seg}" GroupName="src" Tag="AlbumArt" Content="Album art"/>
                     <RadioButton Style="{StaticResource Seg}" GroupName="src" Tag="Screen" Content="Screen"/>
-                    <RadioButton Style="{StaticResource Seg}" GroupName="src" Tag="Custom" Content="My colors"/>
+                    <RadioButton Style="{StaticResource Seg}" GroupName="src" Tag="Custom" Content="Mine" ToolTip="The two colors below"/>
                 </WrapPanel>
 
                 <StackPanel Orientation="Horizontal" Margin="0,6,0,10">
                     <TextBlock Text="Primary" Style="{StaticResource Label}"/>
-                    <Button x:Name="PrimarySwatch" Style="{StaticResource Swatch}" Width="44" Height="26" Margin="0,0,18,0" ToolTip="Pick a color"/>
+                    <Button x:Name="PrimarySwatch" Style="{StaticResource Swatch}" Width="40" Height="24" Margin="0,0,16,0" ToolTip="Pick a color"/>
                     <TextBlock Text="Secondary" Style="{StaticResource Label}"/>
-                    <Button x:Name="SecondarySwatch" Style="{StaticResource Swatch}" Width="44" Height="26" ToolTip="Pick a color"/>
+                    <Button x:Name="SecondarySwatch" Style="{StaticResource Swatch}" Width="40" Height="24" ToolTip="Pick a color"/>
                 </StackPanel>
                 <WrapPanel x:Name="Presets"/>
             </StackPanel>
@@ -203,9 +203,9 @@
                     <RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/>
                 </Grid.RowDefinitions>
                 <TextBlock Grid.Row="0" Text="Thickness" Style="{StaticResource Label}"/>
-                <Slider x:Name="Thickness" Grid.Row="0" Grid.Column="1" Minimum="1" Maximum="30"/>
+                <Slider x:Name="Thickness" Grid.Row="0" Grid.Column="1" Minimum="1" Maximum="20"/>
                 <TextBlock Grid.Row="1" Text="Glow" Style="{StaticResource Label}"/>
-                <Slider x:Name="Glow" Grid.Row="1" Grid.Column="1" Minimum="20" Maximum="400"/>
+                <Slider x:Name="Glow" Grid.Row="1" Grid.Column="1" Minimum="0" Maximum="120"/>
                 <TextBlock Grid.Row="2" Text="Brightness" Style="{StaticResource Label}"/>
                 <Slider x:Name="Brightness" Grid.Row="2" Grid.Column="1" Minimum="0.15" Maximum="1"/>
                 <TextBlock Grid.Row="3" Text="Waviness" Style="{StaticResource Label}"/>
@@ -214,12 +214,12 @@
                 <WrapPanel x:Name="CornerChoices" Grid.Row="4" Grid.Column="1" Margin="0,8,0,0">
                     <RadioButton Style="{StaticResource Seg}" GroupName="corners" Tag="0" Content="Square"/>
                     <RadioButton Style="{StaticResource Seg}" GroupName="corners" Tag="24" Content="Rounded"/>
-                    <RadioButton Style="{StaticResource Seg}" GroupName="corners" Tag="60" Content="Very round"/>
+                    <RadioButton Style="{StaticResource Seg}" GroupName="corners" Tag="60" Content="Round"/>
                 </WrapPanel>
                 <TextBlock Grid.Row="5" Text="Motion" Style="{StaticResource Label}" Margin="0,2,12,0" VerticalAlignment="Top"/>
                 <WrapPanel x:Name="ModeChoices" Grid.Row="5" Grid.Column="1" Margin="0,2,0,0">
                     <RadioButton Style="{StaticResource Seg}" GroupName="mode" Tag="MusicSync" Content="Music sync"/>
-                    <RadioButton Style="{StaticResource Seg}" GroupName="mode" Tag="Steady" Content="Steady glow" ToolTip="A calm glow that stays on, even without sound"/>
+                    <RadioButton Style="{StaticResource Seg}" GroupName="mode" Tag="Steady" Content="Steady" ToolTip="A calm glow that stays on, even without sound"/>
                 </WrapPanel>
             </Grid>
         </Border>
@@ -238,7 +238,7 @@
         <Button x:Name="Quit" Content="Quit Penumbra" HorizontalAlignment="Left" Cursor="Hand" Foreground="#f0f0f5">
             <Button.Template>
                 <ControlTemplate TargetType="Button">
-                    <Border x:Name="b" CornerRadius="8" Background="{StaticResource Control}" Padding="14,7">
+                    <Border x:Name="b" CornerRadius="7" Background="{StaticResource Control}" Padding="12,6">
                         <ContentPresenter/>
                     </Border>
                     <ControlTemplate.Triggers>

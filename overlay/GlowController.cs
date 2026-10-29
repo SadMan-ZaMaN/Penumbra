@@ -8,17 +8,24 @@ namespace LumnWin
     /// <summary>Everything the shader needs for one frame. Sizes are in DIPs; GlowWindow converts to pixels.</summary>
     public class GlowFrame
     {
-        public double Opacity, Rim, Spread, Radius, Time, Phase, Base, Wave, Pulse, White;
+        public double Opacity, Rim, Halo, Radius, Time, Phase, Base, Wave, Pulse, White;
         public Color Primary, Secondary;
-        public GlowController.Light[] Lights = Array.Empty<GlowController.Light>();
+        public GlowController.Stream[] Streams = Array.Empty<GlowController.Stream>();
     }
 
     /// <summary>Turns engine packets + settings into smooth per-frame light.
     /// Update() runs on the glow's render thread; the lyrics line is driven from the UI thread.</summary>
     public class GlowController
     {
-        /// <summary>A bright patch that travels along the edge. Pos/Width are fractions of the perimeter.</summary>
-        public struct Light { public double Pos, Speed, Width, Strength; }
+        /// <summary>A stretch of light that grows, travels along the edge and fades.
+        /// Pos and HalfLength are fractions of the screen's perimeter.</summary>
+        public struct Stream
+        {
+            public double Pos, Speed, HalfLength, TargetLength, Brightness, Strength, Age, Life;
+            public bool Alive;
+        }
+
+        const int MaxStreams = 8;
 
         readonly Settings _settings;
         readonly EngineLink _link;
@@ -28,9 +35,8 @@ namespace LumnWin
 
         // smoothed values
         Color _primary, _secondary;
-        double _opacity, _spread, _rim, _phase, _phaseKick, _pulse, _wave, _waveT, _base, _speedKick;
-        // 0-3 drift around the screen all the time, 4-5 are sparks that split away from each other on a beat
-        readonly Light[] _lights = new Light[6];
+        double _opacity, _rim, _halo, _phase, _phaseKick, _pulse, _wave, _waveT, _base, _speedKick, _energy, _nextSpawn;
+        readonly Stream[] _streams = new Stream[MaxStreams];
         readonly GlowFrame _frame = new();
 
         public LightState? Last { get; private set; }
@@ -43,13 +49,7 @@ namespace LumnWin
             _link = link;
             _primary = Parse(settings.Primary, Colors.MediumPurple);
             _secondary = Parse(settings.Secondary, Colors.HotPink);
-
-            double[] speeds = { 0.042, -0.032, 0.025, -0.054 };   // laps of the screen per second
-            double[] widths = { 0.10, 0.08, 0.12, 0.07 };
-            for (int i = 0; i < 4; i++)
-                _lights[i] = new Light { Pos = i * 0.25 + 0.05, Speed = speeds[i], Width = widths[i] };
-            _lights[4].Width = _lights[5].Width = 0.03;
-            _frame.Lights = new Light[6];
+            _frame.Streams = new Stream[MaxStreams];
 
             ApplyLayout();
             Microsoft.Win32.SystemEvents.DisplaySettingsChanged += (_, _) =>
@@ -77,6 +77,7 @@ namespace LumnWin
             Last = s;
             bool playing = s != null && s.sound;     // any audible sound; silence fades the glow out
             bool steady = _settings.Mode == GlowMode.Steady;
+            bool calm = steady || (!playing && _settings.IdleGlow);
 
             // ---- target colors
             Color tp = Parse(_settings.Primary, Colors.MediumPurple);
@@ -87,20 +88,15 @@ namespace LumnWin
                 ts = Parse(s.colors[1], ts);
             }
 
-            // ---- targets for this moment
-            double b = _settings.Brightness, glow = _settings.Glow;
-            double breathe = 0.5 + 0.5 * Math.Sin(t * 1.1);
-            double level = playing ? s!.level : 0;
-            double tOpacity, tSpread, tRim = _settings.Thickness, tBase, tWave, energy = 0;
-            var strength = new double[4];
-
+            // ---- targets. Loud music changes how bright and lively the streams are, not how big the glow is.
+            double b = _settings.Brightness;
+            double tOpacity, tBase, tWave;
             if (steady)
             {
-                tOpacity = b * (0.85 + 0.08 * breathe);
-                tSpread = glow * 0.9;
-                tBase = 0.4;
-                tWave = 0.35;
-                for (int i = 0; i < 4; i++) strength[i] = 0.5 + 0.15 * Math.Sin(t * 0.4 + i * 1.7);
+                tOpacity = b;
+                tBase = 0.12;
+                tWave = 0.3;
+                _energy = 0.3;
             }
             else if (playing)
             {
@@ -109,25 +105,20 @@ namespace LumnWin
                     _pulse = 1;
                     _phaseKick += 0.35;
                     _speedKick = 1;
-                    SpawnSparks(s!.level);
+                    Spawn(big: true);
                 }
-                energy = Math.Clamp(0.65 * s!.level + 0.5 * Math.Max(_pulse, s.pulse), 0, 1);
-                tOpacity = b * (0.55 + 0.45 * energy);
-                tSpread = glow * (0.55 + 0.35 * s.level + 0.3 * _pulse);
-                tRim = _settings.Thickness * (1 + 0.6 * _pulse);
-                tBase = 0.08 + 0.25 * s.level;
-                tWave = 0.4 + 0.3 * s.level + 0.3 * _pulse;
-                // each drifting light listens to a different part of the sound
-                double[] bands = { s.bass, s.mid, s.high, s.level };
-                for (int i = 0; i < 4; i++) strength[i] = 0.15 + 0.85 * Math.Clamp(0.5 * energy + 0.6 * bands[i], 0, 1);
+                double e = Math.Clamp(0.65 * s!.level + 0.5 * Math.Max(_pulse, s.pulse), 0, 1);
+                _energy += (e - _energy) * (1 - Math.Exp(-8 * dt));
+                tOpacity = b;
+                tBase = 0;                      // between streams the edge is dark
+                tWave = 0.3 + 0.25 * _energy;
             }
             else
             {
-                tOpacity = _settings.IdleGlow ? b * (0.55 + 0.08 * breathe) : 0;
-                tSpread = glow * 0.7;
-                tBase = 0.22;
-                tWave = 0.3;
-                for (int i = 0; i < 4; i++) strength[i] = 0.3;
+                tOpacity = _settings.IdleGlow ? b * 0.6 : 0;
+                tBase = 0.08;
+                tWave = 0.25;
+                _energy = 0.2;
             }
 
             // ---- smoothing (frame-rate independent)
@@ -138,29 +129,38 @@ namespace LumnWin
             }
             _pulse *= Math.Exp(-dt / 0.15);
             _speedKick *= Math.Exp(-dt / 0.4);
-            _opacity = Follow(_opacity, tOpacity, 30, 6, dt);
-            _spread = Follow(_spread, tSpread, 25, 5, dt);
-            _rim = Follow(_rim, tRim, 30, 8, dt);
-            _base = Follow(_base, tBase, 20, 4, dt);
+            _opacity = Follow(_opacity, tOpacity, 8, 3, dt);
+            _rim = Follow(_rim, _settings.Thickness * (1 + 0.25 * _pulse), 30, 8, dt);
+            _halo = Follow(_halo, _settings.Glow * (1 + 0.15 * _pulse), 30, 8, dt);
+            _base = Follow(_base, tBase, 4, 4, dt);
             _wave = Follow(_wave, tWave * _settings.Waviness, 10, 3, dt);
             double colorRate = s?.source == "screen" ? 4 : 2.5;   // follow videos a bit faster than album art
             _primary = Lerp(_primary, tp, 1 - Math.Exp(-colorRate * dt));
             _secondary = Lerp(_secondary, ts, 1 - Math.Exp(-colorRate * dt));
 
-            // ---- motion: lights drift around the screen, faster with louder music and on beats
-            double speed = steady ? 1 : 1 + 2.5 * level + 3 * _speedKick;
-            for (int i = 0; i < 4; i++)
+            // ---- streams: new ones keep appearing (more often when it's loud), each grows, travels, fades
+            _nextSpawn -= dt;
+            if (_nextSpawn <= 0 && (playing || calm))
             {
-                _lights[i].Pos = Wrap(_lights[i].Pos + _lights[i].Speed * speed * dt);
-                _lights[i].Strength = Follow(_lights[i].Strength, strength[i], 25, 4, dt);
+                Spawn(big: false);
+                _nextSpawn = calm ? 2.5 + 2 * _rng.NextDouble()
+                                  : (1.1 - 0.7 * _energy) * (0.6 + 0.8 * _rng.NextDouble());
             }
-            for (int i = 4; i < 6; i++)
+            double speedUp = calm ? 0.5 : 1 + 1.5 * _energy + 2.5 * _speedKick;
+            for (int i = 0; i < MaxStreams; i++)
             {
-                _lights[i].Pos = Wrap(_lights[i].Pos + _lights[i].Speed * dt);
-                _lights[i].Strength *= Math.Exp(-dt / 0.55);
-                _lights[i].Width = Math.Min(0.09, _lights[i].Width + dt * 0.05);
+                ref var st = ref _streams[i];
+                if (!st.Alive) { st.Brightness = 0; continue; }
+                st.Age += dt;
+                st.Pos = Wrap(st.Pos + st.Speed * speedUp * dt);
+                st.HalfLength += (st.TargetLength - st.HalfLength) * (1 - Math.Exp(-2.5 * dt));   // grows out from a point
+                double fadeIn = Math.Clamp(st.Age / 0.3, 0, 1);
+                double fadeOut = Math.Clamp((st.Life - st.Age) / 0.8, 0, 1);
+                double liveliness = calm ? 0.8 : 0.55 + 0.45 * _energy + 0.35 * _pulse;
+                st.Brightness = st.Strength * fadeIn * fadeOut * liveliness;
+                if (st.Age >= st.Life) st.Alive = false;
             }
-            _waveT += dt * (1.0 + 1.5 * level);
+            _waveT += dt * (1.0 + 1.5 * _energy);
 
             // colors slowly turn around the screen; beats give them a nudge
             double kick = _phaseKick * (1 - Math.Exp(-6 * dt));
@@ -169,28 +169,43 @@ namespace LumnWin
 
             var f = _frame;
             f.Opacity = _opacity;
-            f.Rim = Math.Max(0.5, _rim * 0.6);
-            f.Spread = Math.Max(4, _spread);
+            f.Rim = Math.Max(0.5, _rim);
+            f.Halo = Math.Max(1, _halo);
             f.Radius = _settings.CornerRadius;
             f.Time = _waveT;
             f.Phase = _phase;
             f.Base = _base;
             f.Wave = _wave;
             f.Pulse = _pulse;
-            f.White = 0.2 + 0.3 * _pulse;
+            f.White = 0.15 + 0.3 * _pulse;
             f.Primary = _primary;
             f.Secondary = _secondary;
-            Array.Copy(_lights, f.Lights, 6);
+            Array.Copy(_streams, f.Streams, MaxStreams);
             return f;
         }
 
-        /// <summary>A beat sends two sparks racing apart from somewhere along the edge.</summary>
-        void SpawnSparks(double level)
+        /// <summary>Start a new stream somewhere along the edge (replacing the faintest one if all are busy).</summary>
+        void Spawn(bool big)
         {
-            double at = _rng.NextDouble();
-            double v = 0.18 + 0.12 * level;
-            _lights[4] = new Light { Pos = at, Speed = v, Width = 0.025, Strength = 0.9 + 0.4 * level };
-            _lights[5] = new Light { Pos = at, Speed = -v, Width = 0.025, Strength = 0.9 + 0.4 * level };
+            int slot = -1;
+            double faintest = double.MaxValue;
+            for (int i = 0; i < MaxStreams; i++)
+            {
+                if (!_streams[i].Alive) { slot = i; break; }
+                if (_streams[i].Brightness < faintest) { faintest = _streams[i].Brightness; slot = i; }
+            }
+            bool calm = _settings.Mode == GlowMode.Steady;
+            double dir = _rng.Next(2) == 0 ? -1 : 1;
+            _streams[slot] = new Stream
+            {
+                Alive = true,
+                Pos = _rng.NextDouble(),
+                Speed = dir * (calm ? 0.015 : 0.03 + 0.05 * _rng.NextDouble()),
+                HalfLength = 0.005,
+                TargetLength = (calm ? 0.10 : 0.05) + (big ? 0.09 : 0.06) * _rng.NextDouble(),
+                Strength = big ? 1.0 : 0.75 + 0.25 * _rng.NextDouble(),
+                Life = calm ? 6 + 4 * _rng.NextDouble() : 1.4 + 1.8 * _rng.NextDouble(),
+            };
         }
 
         void UpdateLyrics()

@@ -6,7 +6,7 @@ An ambient glow around the edges of your Windows screen. It pulses to whatever i
  ┌──────── engine (Python) ────────┐   UDP 127.0.0.1:47800   ┌──────── overlay (C# / WPF) ─────────┐
  │ system audio (WASAPI loopback)  │   ~60 JSON packets/s    │ 1 full-screen click-through window, │
  │   → FFT → bass/mid/high, beats  │ ──────────────────────► │   drawn on the GPU by Glow.hlsl     │
- │ now playing (Windows media API) │                         │ moving lights, waves, beat sparks   │
+ │ now playing (Windows media API) │                         │ streams of light along the edge     │
  │   music → album art → 2 colors  │                         │ lyrics line above the taskbar       │
  │   video → screen → 2 colors     │                         │ tray menu + settings                │
  │ LRCLIB → synced lyrics          │                         │ starts/stops the engine             │
@@ -24,7 +24,7 @@ Then double-click **`setup.bat`**. It creates `engine\.venv`, installs the Pytho
 ## Run
 
 - **`run.bat`** starts it. A ring icon appears in the tray.
-  - Left-click the icon to open the **Penumbra panel** with all the settings. It's a normal window: minimize it to the taskbar, and closing it just hides it.
+  - Left-click the icon to pop up the **Penumbra panel** with all the settings, just above the tray. Click anywhere else (or press Esc) and it tucks away again.
   - Right-click the icon for quick options: on/off, color source, start with Windows, exit.
 - **`stop.bat`** quits it (same as **Quit Penumbra** in the panel or **Exit** in the tray menu).
 - The glow only shows while something is making sound. When everything is silent for 1.5 seconds, it fades out and the screen looks normal.
@@ -41,12 +41,12 @@ The top of the panel shows what's playing and the colors the glow is using right
 |---|---|
 | On/off switch | Top right. Turns the glow on or off |
 | Colors | **Automatic**: album art for music, the screen for videos. Or always **Album art**, always **Screen**, or **My colors**. Click the Primary/Secondary swatches to pick your own, or click a preset |
-| Thickness | Width of the bright rim at the edge |
-| Glow | How far the light spills toward the middle of the screen |
+| Thickness | Width of the solid line of light along the edge |
+| Glow | Size of the soft halo just inside the line (0 = just the line) |
 | Brightness | Overall intensity |
-| Waviness | How much the glow's inner edge rolls in waves (0 = straight) |
+| Waviness | How much the line's thickness ripples as the light flows (0 = even) |
 | Corners | Square (the default, light reaches right into the corners), rounded or very round |
-| Motion | **Music sync** reacts to the beat and only shows while there's sound. **Steady glow** is a calm light that stays on |
+| Motion | **Music sync** reacts to the beat and only shows while there's sound. **Steady** is a calm, slow light that stays on |
 | Glow when nothing is playing | Keep a dim glow during silence instead of fading out |
 | Show lyrics | Synced lyric line above the taskbar (from lrclib.net) |
 | Show in screenshots & recordings | Off by default, so the screen sampling never sees the glow itself. Turn it on to record a demo of the glow |
@@ -89,8 +89,8 @@ Most of the "feel" lives in a few numbers:
 - **Beat sensitivity**: in `dsp.py`, `thresh = mean + max(1.2 * std, 0.35 * mean)`. Lower the numbers for more beats.
 - **Bass range**: in `dsp.py`, `bands["bass"]` (20–150 Hz).
 - **Pulse size and decay**: in `GlowController.cs`, the `playing` branch and `_pulse *= Math.Exp(-dt / 0.15)`.
-- **Moving lights**: in `GlowController.cs`, the `speeds` / `widths` arrays and `SpawnSparks`.
-- **Shape of the light**: in `Glow.hlsl`, the `core`, `bloom` and `haze` lines and the `glow = ...` mix. The `Waves` function controls the wavy edge.
+- **Streams of light**: in `GlowController.cs`, `Spawn` (length, speed, how long each lives) and the `_nextSpawn` timing (how often new ones appear).
+- **Shape of the light**: in `Glow.hlsl`, `width` (the line), `halo` and the `I = ...` mix. The `Waves` function controls the ripples.
 - **Lyrics early or late**: run `engine.py --lyrics-offset 0.3`.
 - **See the glow on black**: run `LumnWin.exe --black` to judge the look without your desktop behind it. Close it with `stop.bat`.
 

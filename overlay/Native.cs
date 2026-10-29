@@ -51,11 +51,13 @@ namespace LumnWin
         [DllImport("dwmapi.dll")]
         static extern int DwmSetWindowAttribute(IntPtr hWnd, int attr, ref int value, int size);
 
-        /// <summary>Dark title bar to match the panel (Windows 10 20H1+ / 11).</summary>
-        public static void UseDarkTitleBar(IntPtr hwnd)
+        /// <summary>Rounded corners and a dark frame for the borderless pop-up (Windows 11; ignored on 10).</summary>
+        public static void UseRoundedCorners(IntPtr hwnd)
         {
-            int on = 1;
-            DwmSetWindowAttribute(hwnd, 20 /* DWMWA_USE_IMMERSIVE_DARK_MODE */, ref on, sizeof(int));
+            int round = 2;   // DWMWCP_ROUND
+            DwmSetWindowAttribute(hwnd, 33 /* DWMWA_WINDOW_CORNER_PREFERENCE */, ref round, sizeof(int));
+            int dark = 1;
+            DwmSetWindowAttribute(hwnd, 20 /* DWMWA_USE_IMMERSIVE_DARK_MODE */, ref dark, sizeof(int));
         }
 
         // ------------------------------------------------------------------ the glow's own window

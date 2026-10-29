@@ -21,10 +21,10 @@ namespace LumnWin
     {
         public bool Enabled { get; set; } = true;
         public GlowMode Mode { get; set; } = GlowMode.MusicSync;
-        public double Thickness { get; set; } = 8;      // bright rim at the very edge (px)
-        public double Glow { get; set; } = 90;          // how far the light spills inward (px)
+        public double Thickness { get; set; } = 5;      // the solid line along the edge (px)
+        public double Glow { get; set; } = 18;          // the soft halo just inside the line (px)
         public double Brightness { get; set; } = 1.0;   // 0..1
-        public double Waviness { get; set; } = 1.0;     // 0 = straight, 2 = very wavy
+        public double Waviness { get; set; } = 1.0;     // how much the line's thickness ripples: 0 = even, 2 = a lot
         public double CornerRadius { get; set; } = 0;   // px; 0 = square corners, light reaches right into them
         public ColorSource ColorSource { get; set; } = ColorSource.Auto;
         public string Primary { get; set; } = "#7c5cff";

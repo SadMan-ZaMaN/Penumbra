@@ -24,10 +24,10 @@ namespace LumnWin
         struct Constants
         {
             public Vector2 Size; public float Radius, Rim;
-            public float Spread, Opacity, Time, Phase;
+            public float Halo, Opacity, Time, Phase;
             public Vector4 Primary, Secondary;
             public float Base, Wave, Pulse, White;
-            public Vector4 L0, L1, L2, L3, L4, L5;
+            public Vector4 S0, S1, S2, S3, S4, S5, S6, S7;
             public float Backdrop; Vector3 _pad;
         }
 
@@ -205,13 +205,13 @@ namespace LumnWin
         {
             double px = _scale;
             static Vector4 V(System.Windows.Media.Color c) => new(c.R / 255f, c.G / 255f, c.B / 255f, 1);
-            static Vector4 L(GlowController.Light l) => new((float)l.Pos, (float)l.Width, (float)l.Strength, 0);
+            static Vector4 S(GlowController.Stream s) => new((float)s.Pos, (float)s.HalfLength, (float)s.Brightness, 0);
             var c = new Constants
             {
                 Size = new Vector2(Width, Height),
                 Radius = (float)(f.Radius * px),
                 Rim = (float)Math.Max(1, f.Rim * px),
-                Spread = (float)Math.Max(2, f.Spread * px),
+                Halo = (float)Math.Max(1, f.Halo * px),
                 Opacity = (float)f.Opacity,
                 Time = (float)f.Time,
                 Phase = (float)f.Phase,
@@ -221,8 +221,8 @@ namespace LumnWin
                 Wave = (float)f.Wave,
                 Pulse = (float)f.Pulse,
                 White = (float)f.White,
-                L0 = L(f.Lights[0]), L1 = L(f.Lights[1]), L2 = L(f.Lights[2]),
-                L3 = L(f.Lights[3]), L4 = L(f.Lights[4]), L5 = L(f.Lights[5]),
+                S0 = S(f.Streams[0]), S1 = S(f.Streams[1]), S2 = S(f.Streams[2]), S3 = S(f.Streams[3]),
+                S4 = S(f.Streams[4]), S5 = S(f.Streams[5]), S6 = S(f.Streams[6]), S7 = S(f.Streams[7]),
                 Backdrop = _black ? 1 : 0,
             };
             var ctx = _ctx!;
