@@ -12,4 +12,15 @@
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
   </PropertyGroup>
 
+  <ItemGroup>
+    <!-- Direct3D 11 for the GPU-drawn glow; the shader is compiled when the app starts -->
+    <PackageReference Include="Vortice.D3DCompiler" Version="3.8.3" />
+    <PackageReference Include="Vortice.Direct3D11" Version="3.8.3" />
+    <PackageReference Include="Vortice.DirectComposition" Version="3.8.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Glow.hlsl" LogicalName="Glow.hlsl" />
+  </ItemGroup>
+
 </Project>

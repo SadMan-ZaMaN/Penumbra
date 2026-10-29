@@ -32,13 +32,25 @@ namespace LumnWin
                 engine = EngineLauncher.Start(out engineError);
 
             var glow = new GlowController(settings, link);
+            var window = new GlowWindow(settings, glow, black: args.Contains("--black"));
             Tray? tray = null;
-            tray = new Tray(settings, glow, link, () => app.Shutdown());
+            tray = new Tray(settings, glow, link, () => { ControlPanel.Quitting = true; app.Shutdown(); });
             if (engineError != null)
                 tray.Notify("LumnWin: engine not started", engineError);
+            if (args.Contains("--panel")) tray.OpenPanel();
+
+            // the glow window starts on its own thread; report if it couldn't
+            var check = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
+            check.Tick += (_, _) =>
+            {
+                check.Stop();
+                if (window.Error != null) tray.Notify("LumnWin: glow couldn't start", window.Error);
+            };
+            check.Start();
 
             app.Exit += (_, _) =>
             {
+                window.Dispose();
                 tray?.Dispose();
                 link.Dispose();
                 try { if (engine is { HasExited: false }) engine.Kill(entireProcessTree: true); } catch { }

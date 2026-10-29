@@ -6,12 +6,13 @@
 
 Sends ~60 JSON packets/s over UDP to 127.0.0.1:47800, e.g.
     {"level":0.62,"bass":0.8,"mid":0.4,"high":0.2,"pulse":1.0,"beat":true,"bpm":124.0,
-     "colors":["#7c5cff","#ff4fa3"],"playing":true,"title":"...","artist":"...",
-     "lyric":"current line","next":"next line","lprog":0.4}
+     "colors":["#7c5cff","#ff4fa3"],"source":"art","kind":"music","sound":true,"playing":true,
+     "title":"...","artist":"...","lyric":"current line","next":"next line","lprog":0.4}
 """
 import argparse
 import json
 import math
+import os
 import queue
 import socket
 import sys
@@ -23,7 +24,8 @@ import numpy as np
 from colors import DEFAULT, dominant_colors
 from dsp import BeatDetector
 from lyrics import Lyrics
-from media import NowPlaying
+from media import NowPlaying, is_placeholder
+from screen import ScreenSampler
 
 BLOCK = 1024
 FPS = 60
@@ -164,6 +166,45 @@ class DemoSource:
         pass
 
 
+class OverlaySettings:
+    """Reads the overlay's settings.json (re-read when it changes) for the color source."""
+    PATH = os.path.join(os.environ.get("APPDATA", ""), "LumnWin", "settings.json")
+    SOURCES = ["Auto", "AlbumArt", "Screen", "Custom"]
+
+    def __init__(self):
+        self._mtime = None
+        self._next = 0.0
+        self._data = {}
+
+    def color_source(self):
+        now = time.monotonic()
+        if now >= self._next:
+            self._next = now + 1.0
+            try:
+                m = os.path.getmtime(self.PATH)
+                if m != self._mtime:
+                    self._mtime = m
+                    with open(self.PATH, encoding="utf-8-sig") as f:
+                        self._data = json.load(f)
+            except (OSError, ValueError):
+                pass
+        v = self._data.get("ColorSource", "Auto")
+        return self.SOURCES[v] if isinstance(v, int) and 0 <= v < 4 else str(v)
+
+
+def choose_source(setting, kind, playing):
+    """Which colors to use: 'art' (album art / thumbnail), 'screen', or 'custom' (the overlay's own)."""
+    if setting == "Custom":
+        return "custom"
+    if setting == "AlbumArt":
+        return "art"
+    if setting == "Screen":
+        return "screen"
+    # Auto: music -> its art, videos -> what's on screen. Sound without any media session
+    # (games, some players) is treated as a video too.
+    return "screen" if kind == "video" or (kind == "none" and playing) else "art"
+
+
 def watch_parent(pid):
     """Quit when the overlay quits (or crashes), so no orphan engine keeps running."""
     import os
@@ -205,7 +246,11 @@ def main():
     det = BeatDetector(sample_rate=src.rate, block_size=BLOCK)
     media = NowPlaying()
     lyrics = Lyrics()
+    settings = OverlaySettings()
+    sampler = ScreenSampler()
+    art_colors = list(DEFAULT)
     colors = list(DEFAULT)
+    source = "default"
     art_id = -1
 
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -234,22 +279,36 @@ def main():
             if np_state["art_id"] != art_id:
                 art_id = np_state["art_id"]
                 thumb = np_state.get("thumbnail")
-                colors = dominant_colors(thumb) if thumb else list(DEFAULT)
-            lyrics.set_track(np_state["artist"], np_state["title"],
+                if thumb:                    # no art yet: keep the last colors rather than flash to default
+                    art_colors = dominant_colors(thumb)
+            hidden = is_placeholder(np_state["title"], np_state["artist"])   # Incognito: no real title
+            lyrics.set_track(np_state["artist"], "" if hidden else np_state["title"],
                              np_state["album"], np_state["duration"])
             cur, nxt, prog = lyrics.at(np_state["position"], args.lyrics_offset)
+
+            # ---- colors: album art for music, the screen for videos (or what the tray says)
+            sound = det.sound(now) or args.demo
+            playing = bool(np_state["playing"]) or sound
+            source = choose_source(settings.color_source(), np_state["kind"], playing)
+            sampler.active = source == "screen" and playing and not args.demo
+            if source == "screen" and sampler.colors:
+                colors = sampler.colors
+            elif source == "art":
+                colors = art_colors
+            # (screen mode before its first frame, or while paused: keep whatever is showing)
 
             if args.demo and not np_state["title"]:
                 # animate colors a little so the demo isn't static
                 h = (now * 0.03) % 1.0
                 colors = ["#%02x%02x%02x" % tuple(int(127 + 127 * math.sin(2 * math.pi * (h + o)))
-                                                   for o in (0, 1 / 3, 2 / 3)), colors[1]]
+                                                   for o in (0, 1 / 3, 2 / 3)), DEFAULT[1]]
 
             pkt = {
                 "level": round(det.level, 4), "bass": round(det.bass, 4),
                 "mid": round(det.mid, 4), "high": round(det.high, 4),
                 "pulse": round(det.pulse, 4), "beat": beat, "bpm": round(det.bpm, 1),
-                "colors": colors, "playing": bool(np_state["playing"]) or args.demo,
+                "colors": colors, "source": source, "kind": np_state["kind"],
+                "sound": sound, "playing": bool(np_state["playing"]) or args.demo,
                 "title": np_state["title"], "artist": np_state["artist"],
                 "lyric": cur, "next": nxt, "lprog": round(prog, 3),
             }
@@ -259,7 +318,9 @@ def main():
                 last_dbg = now
                 bar = "#" * int(det.level * 30)
                 print(f"\r{'*' if det.pulse > 0.8 else ' '} lvl {det.level:4.2f} "
-                      f"bpm {det.bpm:5.1f} {bar:<30} {np_state['title'][:30]:<30} {cur[:40]:<40}",
+                      f"bpm {det.bpm:5.1f} {bar:<30} {np_state['kind']:>5}->{source:<6} "
+                      f"{colors[0]} {colors[1]} {np_state['app'][:16]:<16} "
+                      f"{np_state['title'][:30]:<30} {cur[:30]:<30}",
                       end="", flush=True)
 
             next_t += frame

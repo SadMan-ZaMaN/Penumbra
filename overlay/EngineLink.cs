@@ -20,6 +20,9 @@ namespace LumnWin
         public bool beat { get; set; }
         public double bpm { get; set; }
         public List<string> colors { get; set; } = new();
+        public string source { get; set; } = "";   // where colors came from: art / screen / default
+        public string kind { get; set; } = "";     // what's playing: music / video / none
+        public bool sound { get; set; }            // something audible is playing right now
         public bool playing { get; set; }
         public string title { get; set; } = "";
         public string artist { get; set; } = "";

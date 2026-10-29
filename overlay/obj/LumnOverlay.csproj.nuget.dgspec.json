@@ -42,6 +42,20 @@
       "frameworks": {
         "net8.0-windows7.0": {
           "targetAlias": "net8.0-windows",
+          "dependencies": {
+            "Vortice.D3DCompiler": {
+              "target": "Package",
+              "version": "[3.8.3, )"
+            },
+            "Vortice.Direct3D11": {
+              "target": "Package",
+              "version": "[3.8.3, )"
+            },
+            "Vortice.DirectComposition": {
+              "target": "Package",
+              "version": "[3.8.3, )"
+            }
+          },
           "imports": [
             "net461",
             "net462",

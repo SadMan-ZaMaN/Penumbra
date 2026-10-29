@@ -6,7 +6,7 @@ using Microsoft.Win32;
 
 namespace LumnWin
 {
-    /// <summary>System tray icon + menu with all the settings.</summary>
+    /// <summary>System tray icon: left-click opens the panel, right-click has the quick settings.</summary>
     public class Tray : IDisposable
     {
         readonly NotifyIcon _icon;
@@ -14,6 +14,7 @@ namespace LumnWin
         readonly GlowController _glow;
         readonly EngineLink _link;
         readonly ToolStripMenuItem _nowPlaying;
+        readonly ControlPanel _panel;
 
         const string RunKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
 
@@ -26,34 +27,17 @@ namespace LumnWin
             menu.Items.Add(_nowPlaying);
             menu.Items.Add(new ToolStripSeparator());
 
+            // the panel has every setting; this menu keeps the quick ones
+            _panel = new ControlPanel(s, glow, link, Changed, exit);
+            var open = new ToolStripMenuItem("Open Penumbra…", null, (_, _) => _panel.Open());
+            open.Font = new Font(open.Font, FontStyle.Bold);
+            menu.Items.Add(open);
             menu.Items.Add(Toggle("Enabled", () => s.Enabled, v => s.Enabled = v));
-            menu.Items.Add(Choice("Mode",
-                ("Music sync", () => s.Mode == GlowMode.MusicSync, () => s.Mode = GlowMode.MusicSync),
-                ("Steady glow", () => s.Mode == GlowMode.Steady, () => s.Mode = GlowMode.Steady)));
-            menu.Items.Add(Choice("Thickness",
-                Opt("Hairline", 3, () => s.Thickness, v => s.Thickness = v),
-                Opt("Thin", 8, () => s.Thickness, v => s.Thickness = v),
-                Opt("Medium", 16, () => s.Thickness, v => s.Thickness = v),
-                Opt("Thick", 30, () => s.Thickness, v => s.Thickness = v)));
-            menu.Items.Add(Choice("Glow",
-                Opt("Whisper", 60, () => s.Glow, v => s.Glow = v),
-                Opt("Soft", 160, () => s.Glow, v => s.Glow = v),
-                Opt("Strong", 280, () => s.Glow, v => s.Glow = v),
-                Opt("Fill the room", 450, () => s.Glow, v => s.Glow = v)));
-            menu.Items.Add(Choice("Brightness",
-                Opt("40%", 0.4, () => s.Brightness, v => s.Brightness = v),
-                Opt("70%", 0.7, () => s.Brightness, v => s.Brightness = v),
-                Opt("85%", 0.85, () => s.Brightness, v => s.Brightness = v),
-                Opt("100%", 1.0, () => s.Brightness, v => s.Brightness = v)));
-
-            var colors = new ToolStripMenuItem("Colors");
-            colors.DropDownItems.Add(Toggle("Follow album art", () => s.FollowAlbumColors, v => s.FollowAlbumColors = v));
-            colors.DropDownItems.Add(new ToolStripMenuItem("Pick primary…", null, (_, _) => Pick(true)));
-            colors.DropDownItems.Add(new ToolStripMenuItem("Pick secondary…", null, (_, _) => Pick(false)));
-            menu.Items.Add(colors);
-
-            menu.Items.Add(Toggle("Glow while paused", () => s.IdleGlow, v => s.IdleGlow = v));
-            menu.Items.Add(Toggle("Show lyrics", () => s.ShowLyrics, v => s.ShowLyrics = v));
+            menu.Items.Add(Choice("Colors",
+                Src("Automatic (album art for music, screen for videos)", ColorSource.Auto),
+                Src("Album art", ColorSource.AlbumArt),
+                Src("What's on screen", ColorSource.Screen),
+                Src("My colors", ColorSource.Custom)));
             menu.Items.Add(new ToolStripSeparator());
             menu.Items.Add(Toggle("Start with Windows", IsAutoStart, SetAutoStart));
             menu.Items.Add(new ToolStripMenuItem("Exit", null, (_, _) => exit()));
@@ -76,10 +60,11 @@ namespace LumnWin
             };
             _icon.MouseClick += (_, e) =>
             {
-                if (e.Button != MouseButtons.Left) return;
-                s.Enabled = !s.Enabled; Changed();
+                if (e.Button == MouseButtons.Left) _panel.Open();
             };
         }
+
+        public void OpenPanel() => _panel.Open();
 
         public void Notify(string title, string text) =>
             _icon.ShowBalloonTip(4000, title, text, ToolTipIcon.Info);
@@ -92,8 +77,8 @@ namespace LumnWin
             return item;
         }
 
-        static (string, Func<bool>, Action) Opt(string text, double value, Func<double> get, Action<double> set) =>
-            (text, () => Math.Abs(get() - value) < 1e-6, () => set(value));
+        (string, Func<bool>, Action) Src(string text, ColorSource value) =>
+            (text, () => _s.ColorSource == value, () => _s.ColorSource = value);
 
         ToolStripMenuItem Choice(string text, params (string text, Func<bool> isOn, Action pick)[] options)
         {
@@ -121,27 +106,16 @@ namespace LumnWin
         {
             _s.Save();
             _glow.ApplyLayout();
+            if (_panel.IsVisible) _panel.Load();   // a change from this menu shows in the open panel too
         }
 
-        void Pick(bool primary)
-        {
-            using var dlg = new ColorDialog { FullOpen = true };
-            var cur = GlowController.Parse(primary ? _s.Primary : _s.Secondary, System.Windows.Media.Colors.White);
-            dlg.Color = Color.FromArgb(cur.R, cur.G, cur.B);
-            if (dlg.ShowDialog() != DialogResult.OK) return;
-            string hex = $"#{dlg.Color.R:x2}{dlg.Color.G:x2}{dlg.Color.B:x2}";
-            if (primary) _s.Primary = hex; else _s.Secondary = hex;
-            _s.FollowAlbumColors = false;   // picking a color means "use mine"
-            Changed();
-        }
-
-        static bool IsAutoStart()
+        internal static bool IsAutoStart()
         {
             using var k = Registry.CurrentUser.OpenSubKey(RunKey);
             return k?.GetValue("LumnWin") != null;
         }
 
-        static void SetAutoStart(bool on)
+        internal static void SetAutoStart(bool on)
         {
             using var k = Registry.CurrentUser.CreateSubKey(RunKey);
             if (on) k.SetValue("LumnWin", $"\"{Environment.ProcessPath}\"");
@@ -151,7 +125,7 @@ namespace LumnWin
         static string Trim(string s, int n) => s.Length <= n ? s : s[..(n - 1)] + "…";
 
         /// <summary>Draws a little glowing ring so we don't need an .ico file.</summary>
-        static Icon MakeIcon()
+        internal static Icon MakeIcon()
         {
             using var bmp = new Bitmap(32, 32);
             using (var g = Graphics.FromImage(bmp))

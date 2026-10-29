@@ -10,6 +10,8 @@ from collections import deque
 
 import numpy as np
 
+AUDIBLE_RMS = 3e-4      # about -70 dBFS: quieter than this counts as silence
+
 
 class BeatDetector:
     def __init__(self, sample_rate=48000, fft_size=2048, history_sec=1.0,
@@ -37,6 +39,7 @@ class BeatDetector:
         self.high = 0.0
         self.pulse = 0.0     # jumps to 1 on a beat, decays quickly
         self.bpm = 0.0
+        self.last_sound = -1e9   # last time anything audible played (absolute loudness, not normalised)
         self._beat_times = deque(maxlen=16)
         self._last_t = time.monotonic()
 
@@ -47,6 +50,8 @@ class BeatDetector:
         self._last_t = now
 
         samples = np.asarray(samples, dtype=np.float32)
+        if len(samples) and float(np.sqrt(np.mean(samples * samples))) > AUDIBLE_RMS:
+            self.last_sound = now
         k = len(samples)
         if k >= self.n:
             self.buf[:] = samples[-self.n:]
@@ -100,6 +105,12 @@ class BeatDetector:
         if beat:
             self.pulse = 1.0
         return beat
+
+    def sound(self, now=None, hold=1.5):
+        """True while something audible is playing (and for `hold` seconds after, so short
+        pauses between songs don't make the glow blink off)."""
+        now = time.monotonic() if now is None else now
+        return now - self.last_sound < hold
 
     def idle(self, dt):
         """Called when no audio arrives (WASAPI loopback goes quiet when nothing plays)."""
