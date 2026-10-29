@@ -1,0 +1,7 @@
+numpy>=1.24
+Pillow>=10.0
+PyAudioWPatch>=0.2.12
+winrt-runtime>=2.0
+winrt-Windows.Foundation>=2.0
+winrt-Windows.Media.Control>=2.0
+winrt-Windows.Storage.Streams>=2.0

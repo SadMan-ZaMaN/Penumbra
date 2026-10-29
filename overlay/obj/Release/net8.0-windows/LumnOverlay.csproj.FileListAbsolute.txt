@@ -1,0 +1,14 @@
+E:\Penumbra\Penumbra\overlay\bin\Release\net8.0-windows\LumnWin.exe
+E:\Penumbra\Penumbra\overlay\bin\Release\net8.0-windows\LumnWin.deps.json
+E:\Penumbra\Penumbra\overlay\bin\Release\net8.0-windows\LumnWin.runtimeconfig.json
+E:\Penumbra\Penumbra\overlay\bin\Release\net8.0-windows\LumnWin.dll
+E:\Penumbra\Penumbra\overlay\bin\Release\net8.0-windows\LumnWin.pdb
+E:\Penumbra\Penumbra\overlay\obj\Release\net8.0-windows\LumnOverlay.GeneratedMSBuildEditorConfig.editorconfig
+E:\Penumbra\Penumbra\overlay\obj\Release\net8.0-windows\LumnOverlay.AssemblyInfoInputs.cache
+E:\Penumbra\Penumbra\overlay\obj\Release\net8.0-windows\LumnOverlay.AssemblyInfo.cs
+E:\Penumbra\Penumbra\overlay\obj\Release\net8.0-windows\LumnOverlay.csproj.CoreCompileInputs.cache
+E:\Penumbra\Penumbra\overlay\obj\Release\net8.0-windows\LumnWin.dll
+E:\Penumbra\Penumbra\overlay\obj\Release\net8.0-windows\refint\LumnWin.dll
+E:\Penumbra\Penumbra\overlay\obj\Release\net8.0-windows\LumnWin.pdb
+E:\Penumbra\Penumbra\overlay\obj\Release\net8.0-windows\LumnOverlay.genruntimeconfig.cache
+E:\Penumbra\Penumbra\overlay\obj\Release\net8.0-windows\ref\LumnWin.dll

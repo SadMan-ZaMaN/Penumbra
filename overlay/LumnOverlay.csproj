@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>   <!-- only for the tray icon + color picker -->
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>   <!-- WPF and WinForms share type names -->
+    <AssemblyName>LumnWin</AssemblyName>
+    <RootNamespace>LumnWin</RootNamespace>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+  </PropertyGroup>
+
+</Project>
