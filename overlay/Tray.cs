@@ -64,7 +64,7 @@ namespace LumnWin
             };
         }
 
-        public void OpenPanel() => _panel.Open();
+        public void OpenPanel() => _panel.Open(toggle: false);
 
         public void Notify(string title, string text) =>
             _icon.ShowBalloonTip(4000, title, text, ToolTipIcon.Info);

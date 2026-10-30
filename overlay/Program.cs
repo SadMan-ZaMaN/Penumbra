@@ -11,8 +11,15 @@ namespace LumnWin
         [STAThread]
         public static void Main(string[] args)
         {
+            using var openPanel = new EventWaitHandle(false, EventResetMode.AutoReset, "LumnWin.Overlay.OpenPanel");
             using var single = new Mutex(true, "LumnWin.Overlay.SingleInstance", out bool first);
-            if (!first) return;   // already running
+            if (!first)
+            {
+                // already running: ask that copy to show its panel (handy when the tray icon is hidden)
+                Native.LetAnyAppComeToFront();
+                openPanel.Set();
+                return;
+            }
 
             var app = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
             var settings = Settings.Load();
@@ -38,6 +45,10 @@ namespace LumnWin
             if (engineError != null)
                 tray.Notify("LumnWin: engine not started", engineError);
             if (args.Contains("--panel")) tray.OpenPanel();
+            new Thread(() =>
+            {
+                while (openPanel.WaitOne()) app.Dispatcher.BeginInvoke(new Action(tray.OpenPanel));
+            }) { IsBackground = true, Name = "OpenPanel" }.Start();
 
             // the glow window starts on its own thread; report if it couldn't
             var check = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };

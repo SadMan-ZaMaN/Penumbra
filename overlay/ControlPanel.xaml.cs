@@ -87,12 +87,16 @@ namespace LumnWin
             Icon = Imaging.CreateBitmapSourceFromHIcon(Tray.MakeIcon().Handle, Int32Rect.Empty, BitmapSizeOptions.FromEmptyOptions());
         }
 
-        /// <summary>Pop up above the tray, or tuck away if it's already open.</summary>
-        public void Open()
+        /// <summary>Pop up above the tray. With <paramref name="toggle"/>, a second call tucks it away again.</summary>
+        public void Open(bool toggle = true)
         {
-            // clicking the tray icon while open first hides the pop-up (it loses focus): don't reopen it
-            if (Environment.TickCount64 - _hiddenAt < 300) return;
-            if (IsVisible) { Hide(); return; }
+            if (toggle)
+            {
+                // clicking the tray icon while open first hides the pop-up (it loses focus): don't reopen it
+                if (Environment.TickCount64 - _hiddenAt < 300) return;
+                if (IsVisible) { Hide(); return; }
+            }
+            else if (IsVisible) { Activate(); return; }
             Show();
             UpdateLayout();
             var wa = SystemParameters.WorkArea;

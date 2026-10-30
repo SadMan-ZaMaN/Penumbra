@@ -51,6 +51,12 @@ namespace LumnWin
         [DllImport("dwmapi.dll")]
         static extern int DwmSetWindowAttribute(IntPtr hWnd, int attr, ref int value, int size);
 
+        [DllImport("user32.dll")]
+        static extern bool AllowSetForegroundWindow(int processId);
+
+        /// <summary>Called by a second launch so the running copy may bring its panel to the front.</summary>
+        public static void LetAnyAppComeToFront() => AllowSetForegroundWindow(-1 /* ASFW_ANY */);
+
         /// <summary>Rounded corners and a dark frame for the borderless pop-up (Windows 11; ignored on 10).</summary>
         public static void UseRoundedCorners(IntPtr hwnd)
         {

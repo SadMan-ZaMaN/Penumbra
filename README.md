@@ -25,6 +25,7 @@ Then double-click **`setup.bat`**. It creates `engine\.venv`, installs the Pytho
 
 - **`run.bat`** starts it. A ring icon appears in the tray.
   - Left-click the icon to pop up the **Penumbra panel** with all the settings, just above the tray. Click anywhere else (or press Esc) and it tucks away again.
+  - Can't see the tray icon (Windows may hide it)? Run **`run.bat`** again while Penumbra is running: that opens the panel too.
   - Right-click the icon for quick options: on/off, color source, start with Windows, exit.
 - **`stop.bat`** quits it (same as **Quit Penumbra** in the panel or **Exit** in the tray menu).
 - The glow only shows while something is making sound. When everything is silent for 1.5 seconds, it fades out and the screen looks normal.
