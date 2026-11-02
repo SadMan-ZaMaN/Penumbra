@@ -235,6 +235,23 @@
             </StackPanel>
         </Border>
 
+        <Grid>
+        <Button x:Name="Reset" HorizontalAlignment="Right" VerticalAlignment="Center" Cursor="Hand"
+                Foreground="#f0f0f5" ToolTip="Reset the look: automatic colors, default thickness, glow, brightness…">
+            <Button.Template>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="b" CornerRadius="7" Background="{StaticResource Control}" Width="32" Height="30">
+                        <TextBlock Text="&#xE72C;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="14"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="b" Property="Background" Value="{StaticResource Accent}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Button.Template>
+        </Button>
         <Button x:Name="Quit" Content="Quit Penumbra" HorizontalAlignment="Left" Cursor="Hand" Foreground="#f0f0f5">
             <Button.Template>
                 <ControlTemplate TargetType="Button">
@@ -249,6 +266,7 @@
                 </ControlTemplate>
             </Button.Template>
         </Button>
+        </Grid>
     </StackPanel>
     </ScrollViewer>
 </Window>

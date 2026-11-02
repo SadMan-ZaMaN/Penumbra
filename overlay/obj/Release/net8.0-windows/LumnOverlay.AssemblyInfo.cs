@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("LumnWin")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+3b55d4e4895ef8f6de359075be5cdc72d6cbe895")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+9efb6ff5e6555f49373b450a1469daf0817c9a3d")]
 [assembly: System.Reflection.AssemblyProductAttribute("LumnWin")]
 [assembly: System.Reflection.AssemblyTitleAttribute("LumnWin")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

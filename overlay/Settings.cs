@@ -33,6 +33,22 @@ namespace LumnWin
         public bool ShowLyrics { get; set; } = false;
         public bool ShowInCapture { get; set; } = false; // visible in screenshots / recordings
 
+        /// <summary>Back to the default look: automatic colors, default thickness, glow, brightness,
+        /// waviness, corners and motion. Behaviour switches (lyrics, start with Windows...) stay as they are.</summary>
+        public void ResetLook()
+        {
+            var d = new Settings();
+            Mode = d.Mode;
+            Thickness = d.Thickness;
+            Glow = d.Glow;
+            Brightness = d.Brightness;
+            Waviness = d.Waviness;
+            CornerRadius = d.CornerRadius;
+            ColorSource = d.ColorSource;
+            Primary = d.Primary;
+            Secondary = d.Secondary;
+        }
+
         static string FilePath => Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "LumnWin", "settings.json");
 

@@ -52,6 +52,7 @@ The top of the panel shows what's playing and the colors the glow is using right
 | Show lyrics | Synced lyric line above the taskbar (from lrclib.net) |
 | Show in screenshots & recordings | Off by default, so the screen sampling never sees the glow itself. Turn it on to record a demo of the glow |
 | Start with Windows | Adds or removes a registry Run entry |
+| ↻ (bottom right) | Resets the look: Auto colors, and default thickness, glow, brightness, waviness, corners and motion. The switches above stay as they are |
 
 ### How the colors are picked
 

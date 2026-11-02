@@ -62,6 +62,7 @@ namespace LumnWin
             PrimarySwatch.Click += (_, _) => Pick(true);
             SecondarySwatch.Click += (_, _) => Pick(false);
             Quit.Click += (_, _) => quit();
+            Reset.Click += (_, _) => { _s.ResetLook(); Load(); Set(() => { }); };
 
             foreach (var (name, a, b) in PresetColors)
             {
