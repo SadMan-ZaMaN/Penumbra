@@ -63,6 +63,73 @@ def grab(width=64, height=40, margin=0.1):
     return np.frombuffer(buf, dtype=np.uint8).reshape(height, width, 4)[..., 2::-1]   # BGRA -> RGB
 
 
+class AppVisibility:
+    """Is the playing app's window actually on screen (not minimized or hidden behind others)?
+    Checks which window is under a 3x3 grid of points on the screen; cached for half a second."""
+
+    # media session ids that don't contain their program's name
+    KNOWN = {"308046b0af4a39cb": "firefox", "msedge": "msedge"}
+
+    def __init__(self):
+        self._cache = {}            # app id -> (time, visible)
+        self._names = {}            # pid -> exe name
+        if sys.platform == "win32":
+            u = _user32
+            u.WindowFromPoint.restype = _H
+            u.WindowFromPoint.argtypes = [ctypes.c_longlong]
+            u.GetAncestor.restype = _H
+            u.GetAncestor.argtypes = [_H, ctypes.c_uint]
+            u.GetWindowThreadProcessId.argtypes = [_H, ctypes.POINTER(wintypes.DWORD)]
+            k = ctypes.windll.kernel32
+            k.OpenProcess.restype = _H
+            k.QueryFullProcessImageNameW.argtypes = [_H, wintypes.DWORD, ctypes.c_wchar_p, ctypes.POINTER(wintypes.DWORD)]
+            k.CloseHandle.argtypes = [_H]
+
+    def _exe(self, pid):
+        if pid not in self._names:
+            name = ""
+            k = ctypes.windll.kernel32
+            h = k.OpenProcess(0x1000, False, pid)        # PROCESS_QUERY_LIMITED_INFORMATION
+            if h:
+                buf, size = ctypes.create_unicode_buffer(512), wintypes.DWORD(512)
+                if k.QueryFullProcessImageNameW(h, 0, buf, ctypes.byref(size)):
+                    name = buf.value.rsplit("\\", 1)[-1].lower().removesuffix(".exe")
+                k.CloseHandle(h)
+            self._names[pid] = name
+        return self._names[pid]
+
+    def visible(self, app):
+        """True if any part of the screen's middle shows a window of `app` (a media session id
+        like "Brave", "Chrome", "VideoLAN.VLC"). Unknown apps count as visible."""
+        if sys.platform != "win32" or not app:
+            return True
+        now = time.monotonic()
+        hit = self._cache.get(app)
+        if hit and now - hit[0] < 0.5:
+            return hit[1]
+        a = app.lower().removesuffix(".exe")
+        key = self.KNOWN.get(a, a.rsplit(".", 1)[-1].split("!")[-1])
+        sw, sh = _user32.GetSystemMetrics(0), _user32.GetSystemMetrics(1)
+        seen = False
+        for fx in (0.25, 0.5, 0.75):
+            for fy in (0.25, 0.5, 0.75):
+                x, y = int(sw * fx), int(sh * fy)
+                hwnd = _user32.WindowFromPoint((y << 32) | x)
+                root = _user32.GetAncestor(hwnd, 2) if hwnd else None   # GA_ROOT
+                if not root:
+                    continue
+                pid = wintypes.DWORD()
+                _user32.GetWindowThreadProcessId(root, ctypes.byref(pid))
+                exe = self._exe(pid.value)
+                if exe and (key in exe or exe in key):
+                    seen = True
+                    break
+            if seen:
+                break
+        self._cache[app] = (now, seen)
+        return seen
+
+
 class ScreenSampler:
     """Background thread that keeps `colors` up to date while `active` is True."""
 

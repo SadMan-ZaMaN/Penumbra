@@ -180,6 +180,9 @@
                     <RadioButton Style="{StaticResource Seg}" GroupName="src" Tag="Screen" Content="Screen"/>
                     <RadioButton Style="{StaticResource Seg}" GroupName="src" Tag="Custom" Content="Mine" ToolTip="The two colors below"/>
                 </WrapPanel>
+                <CheckBox x:Name="HiddenVideoThumbnail" Style="{StaticResource Switch}" Margin="0,2,0,4"
+                          Content="Hidden video: use its thumbnail"
+                          ToolTip="With Auto: when a video plays minimized or behind other windows, take the colors from its thumbnail instead of the screen"/>
 
                 <StackPanel Orientation="Horizontal" Margin="0,6,0,10">
                     <TextBlock Text="Primary" Style="{StaticResource Label}"/>

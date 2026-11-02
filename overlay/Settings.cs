@@ -27,6 +27,7 @@ namespace LumnWin
         public double Waviness { get; set; } = 1.0;     // how much the line's thickness ripples: 0 = even, 2 = a lot
         public double CornerRadius { get; set; } = 0;   // px; 0 = square corners, light reaches right into them
         public ColorSource ColorSource { get; set; } = ColorSource.Auto;
+        public bool HiddenVideoThumbnail { get; set; } = false;   // Auto: a minimized / covered video uses its thumbnail, not the screen
         public string Primary { get; set; } = "#7c5cff";
         public string Secondary { get; set; } = "#ff4fa3";
         public bool IdleGlow { get; set; } = false;     // dim glow when nothing is playing (off: screen looks normal)

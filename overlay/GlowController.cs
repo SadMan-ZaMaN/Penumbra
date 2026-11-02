@@ -134,7 +134,7 @@ namespace LumnWin
             _halo = Follow(_halo, _settings.Glow * (1 + 0.15 * _pulse), 30, 8, dt);
             _base = Follow(_base, tBase, 4, 4, dt);
             _wave = Follow(_wave, tWave * _settings.Waviness, 10, 3, dt);
-            double colorRate = s?.source == "screen" ? 4 : 2.5;   // follow videos a bit faster than album art
+            double colorRate = s?.source == "screen" ? 4 : 2.5;   // follow the screen a bit faster than album art / thumbnails
             _primary = Lerp(_primary, tp, 1 - Math.Exp(-colorRate * dt));
             _secondary = Lerp(_secondary, ts, 1 - Math.Exp(-colorRate * dt));
 

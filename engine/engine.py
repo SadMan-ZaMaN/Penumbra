@@ -25,7 +25,7 @@ from colors import DEFAULT, dominant_colors
 from dsp import BeatDetector
 from lyrics import Lyrics
 from media import NowPlaying, is_placeholder
-from screen import ScreenSampler
+from screen import AppVisibility, ScreenSampler
 
 BLOCK = 1024
 FPS = 60
@@ -176,7 +176,7 @@ class OverlaySettings:
         self._next = 0.0
         self._data = {}
 
-    def color_source(self):
+    def get(self, key, default):
         now = time.monotonic()
         if now >= self._next:
             self._next = now + 1.0
@@ -188,7 +188,10 @@ class OverlaySettings:
                         self._data = json.load(f)
             except (OSError, ValueError):
                 pass
-        v = self._data.get("ColorSource", "Auto")
+        return self._data.get(key, default)
+
+    def color_source(self):
+        v = self.get("ColorSource", "Auto")
         return self.SOURCES[v] if isinstance(v, int) and 0 <= v < 4 else str(v)
 
 
@@ -248,6 +251,7 @@ def main():
     lyrics = Lyrics()
     settings = OverlaySettings()
     sampler = ScreenSampler()
+    visibility = AppVisibility()
     art_colors = list(DEFAULT)
     colors = list(DEFAULT)
     source = "default"
@@ -289,11 +293,18 @@ def main():
             # ---- colors: album art for music, the screen for videos (or what the tray says)
             sound = det.sound(now) or args.demo
             playing = bool(np_state["playing"]) or sound
-            source = choose_source(settings.color_source(), np_state["kind"], playing)
+            setting = settings.color_source()
+            source = choose_source(setting, np_state["kind"], playing)
+            # optional (off by default): a video that's minimized or hidden behind other windows
+            # uses its thumbnail instead of whatever else is on screen
+            if (source == "screen" and setting == "Auto" and np_state["kind"] == "video"
+                    and np_state["art_colorful"] and settings.get("HiddenVideoThumbnail", False)
+                    and not visibility.visible(np_state["app"])):
+                source = "thumbnail"
             sampler.active = source == "screen" and playing and not args.demo
             if source == "screen" and sampler.colors:
                 colors = sampler.colors
-            elif source == "art":
+            elif source in ("art", "thumbnail"):
                 colors = art_colors
             # (screen mode before its first frame, or while paused: keep whatever is showing)
 

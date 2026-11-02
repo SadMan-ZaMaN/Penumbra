@@ -42,6 +42,7 @@ The top of the panel shows what's playing and the colors the glow is using right
 |---|---|
 | On/off switch | Top right. Turns the glow on or off |
 | Colors | **Automatic**: album art for music, the screen for videos. Or always **Album art**, always **Screen**, or **My colors**. Click the Primary/Secondary swatches to pick your own, or click a preset |
+| Hidden video: use its thumbnail | Off by default. With Auto, a video that's minimized or covered by another window takes its colors from its thumbnail instead of the screen. When the video is back in view, the screen's colors take over again |
 | Thickness | Width of the solid line of light along the edge |
 | Glow | Size of the soft halo just inside the line (0 = just the line) |
 | Brightness | Overall intensity |
@@ -60,6 +61,7 @@ The top of the panel shows what's playing and the colors the glow is using right
 - **Incognito / InPrivate windows** hide what's playing from Windows: the title becomes "A site is playing media" and the art is the Incognito icon. Those, and any art with no real color in it, use the screen's colors instead.
 - **Music:** the color that covers the most of the cover art wins, with vivid colors counting a bit extra. Grey, black and white don't count, so a black cover with yellow text glows yellow. A completely black-and-white cover glows soft white.
 - **Videos:** the middle of the screen is sampled 6 times a second, and the same rule picks the colors. Dark frames keep the previous colors.
+  With **Hidden video: use its thumbnail** on, a video that isn't visible (its window minimized or covered) uses its thumbnail instead. Visibility is checked by looking at which window is under a 3×3 grid of points on the screen.
 
 Settings are saved in `%APPDATA%\LumnWin\settings.json`.
 

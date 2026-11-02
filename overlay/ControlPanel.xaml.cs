@@ -56,6 +56,7 @@ namespace LumnWin
             Brightness.ValueChanged += (_, e) => Set(() => _s.Brightness = e.NewValue);
             Waviness.ValueChanged += (_, e) => Set(() => _s.Waviness = e.NewValue);
             IdleGlow.Click += (_, _) => Set(() => _s.IdleGlow = IdleGlow.IsChecked == true);
+            HiddenVideoThumbnail.Click += (_, _) => Set(() => _s.HiddenVideoThumbnail = HiddenVideoThumbnail.IsChecked == true);
             ShowLyrics.Click += (_, _) => Set(() => _s.ShowLyrics = ShowLyrics.IsChecked == true);
             ShowInCapture.Click += (_, _) => Set(() => _s.ShowInCapture = ShowInCapture.IsChecked == true);
             AutoStart.Click += (_, _) => Tray.SetAutoStart(AutoStart.IsChecked == true);
@@ -122,6 +123,7 @@ namespace LumnWin
             PrimarySwatch.Background = new SolidColorBrush(GlowController.Parse(_s.Primary, Colors.MediumPurple));
             SecondarySwatch.Background = new SolidColorBrush(GlowController.Parse(_s.Secondary, Colors.HotPink));
             IdleGlow.IsChecked = _s.IdleGlow;
+            HiddenVideoThumbnail.IsChecked = _s.HiddenVideoThumbnail;
             ShowLyrics.IsChecked = _s.ShowLyrics;
             ShowInCapture.IsChecked = _s.ShowInCapture;
             AutoStart.IsChecked = Tray.IsAutoStart();
@@ -178,6 +180,7 @@ namespace LumnWin
             string from = _s.ColorSource == ColorSource.Custom ? "Your colors"
                 : st?.source == "art" ? "From the album art"
                 : st?.source == "screen" ? "From the screen"
+                : st?.source == "thumbnail" ? "From the video's thumbnail (video is hidden)"
                 : "Default colors";
             if (!_s.Enabled) from += " · glow is switched off";
             else if (!sound && !_s.IdleGlow && _s.Mode == GlowMode.MusicSync) from += " · glow waits for sound";

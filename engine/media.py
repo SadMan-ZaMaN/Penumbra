@@ -106,7 +106,7 @@ class NowPlaying:
     def __init__(self, poll_interval=0.5):
         self.poll_interval = poll_interval
         self._lock = threading.Lock()
-        self._state = dict(title="", artist="", album="", app="", kind="none", playing=False,
+        self._state = dict(title="", artist="", album="", app="", kind="none", art_colorful=False, playing=False,
                            position=0.0, duration=0.0, stamp=time.monotonic(),
                            thumbnail=None, track_id=0, art_id=0)
         self._track_id = 0
@@ -183,6 +183,7 @@ class NowPlaying:
                             album=props.album_title or "", app=app, playing=playing,
                             kind=classify(app, props.title, props.artist, props.album_title,
                                           thumb_size, art_colorful, ptype),
+                            art_colorful=art_colorful,
                             position=pos, duration=dur, stamp=time.monotonic(),
                             track_id=self._track_id)
                         if changed:
