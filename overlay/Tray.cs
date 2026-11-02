@@ -4,7 +4,7 @@ using System.Drawing.Drawing2D;
 using System.Windows.Forms;
 using Microsoft.Win32;
 
-namespace LumnWin
+namespace Penumbra
 {
     /// <summary>System tray icon: left-click opens the panel, right-click has the quick settings.</summary>
     public class Tray : IDisposable
@@ -21,9 +21,10 @@ namespace LumnWin
         public Tray(Settings s, GlowController glow, EngineLink link, Action exit)
         {
             _s = s; _glow = glow; _link = link;
+            MoveOldAutoStart();
 
             var menu = new ContextMenuStrip();
-            _nowPlaying = new ToolStripMenuItem("LumnWin") { Enabled = false };
+            _nowPlaying = new ToolStripMenuItem("Penumbra") { Enabled = false };
             menu.Items.Add(_nowPlaying);
             menu.Items.Add(new ToolStripSeparator());
 
@@ -54,7 +55,7 @@ namespace LumnWin
             _icon = new NotifyIcon
             {
                 Icon = MakeIcon(),
-                Text = "LumnWin",
+                Text = "Penumbra",
                 ContextMenuStrip = menu,
                 Visible = true,
             };
@@ -112,14 +113,28 @@ namespace LumnWin
         internal static bool IsAutoStart()
         {
             using var k = Registry.CurrentUser.OpenSubKey(RunKey);
-            return k?.GetValue("LumnWin") != null;
+            return k?.GetValue("Penumbra") != null;
         }
 
         internal static void SetAutoStart(bool on)
         {
             using var k = Registry.CurrentUser.CreateSubKey(RunKey);
-            if (on) k.SetValue("LumnWin", $"\"{Environment.ProcessPath}\"");
-            else k.DeleteValue("LumnWin", false);
+            if (on) k.SetValue("Penumbra", $"\"{Environment.ProcessPath}\"");
+            else k.DeleteValue("Penumbra", false);
+        }
+
+        /// <summary>The app used to be called LumnWin: swap an old "start with Windows" entry
+        /// (which points at the old LumnWin.exe) for one that starts this Penumbra.exe.</summary>
+        internal static void MoveOldAutoStart()
+        {
+            try
+            {
+                using var k = Registry.CurrentUser.OpenSubKey(RunKey, writable: true);
+                if (k?.GetValue("LumnWin") == null) return;
+                k.DeleteValue("LumnWin", false);
+                SetAutoStart(true);
+            }
+            catch { }
         }
 
         static string Trim(string s, int n) => s.Length <= n ? s : s[..(n - 1)] + "…";

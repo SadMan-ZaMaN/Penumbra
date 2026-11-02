@@ -6,7 +6,7 @@ using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Media.Effects;
 
-namespace LumnWin
+namespace Penumbra
 {
     /// <summary>Click-through karaoke-style line above the taskbar: current line glowing, next line dim.</summary>
     public class LyricsWindow : Window
@@ -27,7 +27,7 @@ namespace LumnWin
             ShowActivated = false;
             ResizeMode = ResizeMode.NoResize;
             IsHitTestVisible = false;
-            Title = "LumnWin Lyrics";
+            Title = "Penumbra Lyrics";
 
             var font = new FontFamily("Segoe UI Variable Display, Segoe UI");
             _glow = new DropShadowEffect { ShadowDepth = 0, BlurRadius = 22, Opacity = 0.9, Color = Colors.MediumPurple };

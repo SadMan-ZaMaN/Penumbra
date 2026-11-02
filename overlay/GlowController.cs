@@ -3,7 +3,7 @@ using System.Windows;
 using System.Windows.Media;
 using System.Windows.Threading;
 
-namespace LumnWin
+namespace Penumbra
 {
     /// <summary>Everything the shader needs for one frame. Sizes are in DIPs; GlowWindow converts to pixels.</summary>
     public class GlowFrame

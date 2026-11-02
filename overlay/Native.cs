@@ -1,7 +1,7 @@
 using System;
 using System.Runtime.InteropServices;
 
-namespace LumnWin
+namespace Penumbra
 {
     /// <summary>Win32 bits WPF doesn't expose: click-through + always-on-top tool windows.</summary>
     internal static class Native
@@ -130,13 +130,13 @@ namespace LumnWin
                 cbSize = (uint)Marshal.SizeOf<WNDCLASSEX>(),
                 lpfnWndProc = Marshal.GetFunctionPointerForDelegate(proc),
                 hInstance = inst,
-                lpszClassName = "LumnWinGlow",
+                lpszClassName = "PenumbraGlow",
             };
             RegisterClassExW(ref wc);
             // layered + transparent = clicks pass through; no redirection bitmap = nothing copied through the CPU
             uint ex = (uint)(WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_LAYERED | WS_EX_TRANSPARENT | WS_EX_NOACTIVATE
                              | WS_EX_NOREDIRECTIONBITMAP);
-            var hwnd = CreateWindowExW(ex, "LumnWinGlow", "LumnWin Glow", WS_POPUP,
+            var hwnd = CreateWindowExW(ex, "PenumbraGlow", "Penumbra Glow", WS_POPUP,
                 r.Left, r.Top, r.Right - r.Left, r.Bottom - r.Top, IntPtr.Zero, IntPtr.Zero, inst, IntPtr.Zero);
             if (hwnd == IntPtr.Zero) throw new InvalidOperationException("CreateWindowEx failed: " + Marshal.GetLastWin32Error());
             SetLayeredWindowAttributes(hwnd, 0, 255, 2 /* LWA_ALPHA */);

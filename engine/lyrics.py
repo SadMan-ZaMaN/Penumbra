@@ -7,7 +7,7 @@ import urllib.parse
 import urllib.request
 
 API = "https://lrclib.net/api"
-HEADERS = {"User-Agent": "LumnWin/0.1 (personal ambient light project)"}
+HEADERS = {"User-Agent": "Penumbra/0.1 (personal ambient light project)"}
 _TAG = re.compile(r"\[(\d+):(\d+(?:\.\d+)?)\]")
 
 

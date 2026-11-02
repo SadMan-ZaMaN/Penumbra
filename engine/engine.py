@@ -1,4 +1,4 @@
-"""LumnWin engine: listens to system audio + now-playing info, streams a light state to the overlay.
+"""Penumbra engine: listens to system audio + now-playing info, streams a light state to the overlay.
 
     python engine.py            # normal
     python engine.py --debug    # print live values in the console
@@ -168,7 +168,7 @@ class DemoSource:
 
 class OverlaySettings:
     """Reads the overlay's settings.json (re-read when it changes) for the color source."""
-    PATH = os.path.join(os.environ.get("APPDATA", ""), "LumnWin", "settings.json")
+    PATH = os.path.join(os.environ.get("APPDATA", ""), "Penumbra", "settings.json")
     SOURCES = ["Auto", "AlbumArt", "Screen", "Custom"]
 
     def __init__(self):

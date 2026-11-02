@@ -22,7 +22,7 @@ cbuffer Glow : register(b0)
     float  Pulse;       // beat flash 0..1
     float  White;       // a touch of white in the middle of the line
     float4 Streams[8];  // x = centre along the edge 0..1, y = half length 0..0.5, z = brightness
-    float  Backdrop;    // 1 = draw on black instead of see-through (LumnWin.exe --black, for tuning)
+    float  Backdrop;    // 1 = draw on black instead of see-through (Penumbra.exe --black, for tuning)
 };
 
 static const float TAU = 6.28318530718;

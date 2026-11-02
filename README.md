@@ -1,4 +1,4 @@
-# LumnWin
+# Penumbra
 
 An ambient glow around the edges of your Windows screen. It pulses to whatever is playing, takes its colors from the album art (music) or from the screen (videos), and can show synced lyrics.
 
@@ -63,7 +63,7 @@ The top of the panel shows what's playing and the colors the glow is using right
 - **Videos:** the middle of the screen is sampled 6 times a second, and the same rule picks the colors. Dark frames keep the previous colors.
   With **Hidden video: use its thumbnail** on, a video that isn't visible (its window minimized or covered) uses its thumbnail instead. Visibility is checked by looking at which window is under a 3×3 grid of points on the screen.
 
-Settings are saved in `%APPDATA%\LumnWin\settings.json`.
+Settings are saved in `%APPDATA%\Penumbra\settings.json` (moved over automatically from `%APPDATA%\LumnWin`, the app's old name).
 
 ## Files
 
@@ -96,7 +96,7 @@ Most of the "feel" lives in a few numbers:
 - **Streams of light**: in `GlowController.cs`, `Spawn` (length, speed, how long each lives) and the `_nextSpawn` timing (how often new ones appear).
 - **Shape of the light**: in `Glow.hlsl`, `width` (the line), `halo` and the `I = ...` mix. The `Waves` function controls the ripples.
 - **Lyrics early or late**: run `engine.py --lyrics-offset 0.3`.
-- **See the glow on black**: run `LumnWin.exe --black` to judge the look without your desktop behind it. Close it with `stop.bat`.
+- **See the glow on black**: run `Penumbra.exe --black` to judge the look without your desktop behind it. Close it with `stop.bat`.
 
 ## Known limits / next steps
 

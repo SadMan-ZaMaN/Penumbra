@@ -3,7 +3,7 @@ using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace LumnWin
+namespace Penumbra
 {
     public enum GlowMode { MusicSync, Steady }
 
@@ -16,7 +16,7 @@ namespace LumnWin
         Custom,     // Primary / Secondary below
     }
 
-    /// <summary>User settings, saved to %APPDATA%\LumnWin\settings.json.</summary>
+    /// <summary>User settings, saved to %APPDATA%\Penumbra\settings.json.</summary>
     public class Settings
     {
         public bool Enabled { get; set; } = true;
@@ -50,8 +50,9 @@ namespace LumnWin
             Secondary = d.Secondary;
         }
 
-        static string FilePath => Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "LumnWin", "settings.json");
+        static string AppData => Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+        static string FilePath => Path.Combine(AppData, "Penumbra", "settings.json");
+        static string OldFolder => Path.Combine(AppData, "LumnWin");   // before the app was renamed
 
         static readonly JsonSerializerOptions Json = new()
         {
@@ -61,6 +62,7 @@ namespace LumnWin
 
         public static Settings Load()
         {
+            MoveOldSettings();
             try
             {
                 if (File.Exists(FilePath))
@@ -68,6 +70,20 @@ namespace LumnWin
             }
             catch { /* corrupt file: start fresh */ }
             return new Settings();
+        }
+
+        /// <summary>The app used to be called LumnWin: bring its settings over to the Penumbra folder once.</summary>
+        static void MoveOldSettings()
+        {
+            try
+            {
+                string old = Path.Combine(OldFolder, "settings.json");
+                if (File.Exists(FilePath) || !File.Exists(old)) return;
+                Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
+                File.Move(old, FilePath);
+                if (Directory.GetFileSystemEntries(OldFolder).Length == 0) Directory.Delete(OldFolder);
+            }
+            catch { /* keep going with defaults rather than fail to start */ }
         }
 
         public void Save()

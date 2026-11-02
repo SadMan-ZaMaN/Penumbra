@@ -7,7 +7,7 @@ using System.Net.Sockets;
 using System.Text.Json;
 using System.Threading;
 
-namespace LumnWin
+namespace Penumbra
 {
     /// <summary>One packet from the Python engine (see engine/engine.py).</summary>
     public class LightState
@@ -91,7 +91,7 @@ namespace LumnWin
             string engineDir = Path.GetDirectoryName(script)!;
 
             var candidates = new List<string>();
-            var env = Environment.GetEnvironmentVariable("LUMN_PYTHON");
+            var env = Environment.GetEnvironmentVariable("PENUMBRA_PYTHON");
             if (!string.IsNullOrWhiteSpace(env)) candidates.Add(env);
             candidates.Add(Path.Combine(engineDir, ".venv", "Scripts", "pythonw.exe"));
             candidates.Add("pythonw");
@@ -116,7 +116,7 @@ namespace LumnWin
                 }
                 catch { /* try next */ }
             }
-            error = "couldn't start Python (set up engine\\.venv or LUMN_PYTHON)";
+            error = "couldn't start Python (set up engine\\.venv or PENUMBRA_PYTHON)";
             return null;
         }
 

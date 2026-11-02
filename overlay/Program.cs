@@ -4,15 +4,15 @@ using System.Linq;
 using System.Threading;
 using System.Windows;
 
-namespace LumnWin
+namespace Penumbra
 {
     public static class Program
     {
         [STAThread]
         public static void Main(string[] args)
         {
-            using var openPanel = new EventWaitHandle(false, EventResetMode.AutoReset, "LumnWin.Overlay.OpenPanel");
-            using var single = new Mutex(true, "LumnWin.Overlay.SingleInstance", out bool first);
+            using var openPanel = new EventWaitHandle(false, EventResetMode.AutoReset, "Penumbra.OpenPanel");
+            using var single = new Mutex(true, "Penumbra.SingleInstance", out bool first);
             if (!first)
             {
                 // already running: ask that copy to show its panel (handy when the tray icon is hidden)
@@ -28,7 +28,7 @@ namespace LumnWin
             try { link = new EngineLink(47800); }
             catch (Exception e)
             {
-                MessageBox.Show("Couldn't open UDP port 47800: " + e.Message, "LumnWin");
+                MessageBox.Show("Couldn't open UDP port 47800: " + e.Message, "Penumbra");
                 return;
             }
 
@@ -43,7 +43,7 @@ namespace LumnWin
             Tray? tray = null;
             tray = new Tray(settings, glow, link, () => { ControlPanel.Quitting = true; app.Shutdown(); });
             if (engineError != null)
-                tray.Notify("LumnWin: engine not started", engineError);
+                tray.Notify("Penumbra: engine not started", engineError);
             if (args.Contains("--panel")) tray.OpenPanel();
             new Thread(() =>
             {
@@ -55,7 +55,7 @@ namespace LumnWin
             check.Tick += (_, _) =>
             {
                 check.Stop();
-                if (window.Error != null) tray.Notify("LumnWin: glow couldn't start", window.Error);
+                if (window.Error != null) tray.Notify("Penumbra: glow couldn't start", window.Error);
             };
             check.Start();
 

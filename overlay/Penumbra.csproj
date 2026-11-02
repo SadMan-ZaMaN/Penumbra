@@ -7,8 +7,8 @@
     <UseWindowsForms>true</UseWindowsForms>   <!-- only for the tray icon + color picker -->
     <Nullable>enable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>   <!-- WPF and WinForms share type names -->
-    <AssemblyName>LumnWin</AssemblyName>
-    <RootNamespace>LumnWin</RootNamespace>
+    <AssemblyName>Penumbra</AssemblyName>
+    <RootNamespace>Penumbra</RootNamespace>
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
   </PropertyGroup>
 

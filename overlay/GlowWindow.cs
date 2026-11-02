@@ -11,7 +11,7 @@ using Vortice.DirectComposition;
 using Vortice.DXGI;
 using Vortice.Mathematics;
 
-namespace LumnWin
+namespace Penumbra
 {
     /// <summary>
     /// One full-screen, click-through window drawn on the GPU by Glow.hlsl.

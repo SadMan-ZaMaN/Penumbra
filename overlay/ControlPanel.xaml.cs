@@ -7,7 +7,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 
-namespace LumnWin
+namespace Penumbra
 {
     /// <summary>The settings pop-up (left-click the tray icon). It sits above the tray and hides as soon
     /// as you click anywhere else. Changes show on screen immediately; saving to settings.json is
