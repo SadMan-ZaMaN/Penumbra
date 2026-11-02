@@ -100,7 +100,7 @@ float4 PS(float4 pos : SV_Position) : SV_Target
 {
     // distance to each straight edge: top, right, bottom, left
     float4 de = float4(pos.y, Size.x - pos.x, Size.y - pos.y, pos.x);
-    float reach = Rim * 2.5 + Halo * 5 + 4;
+    float reach = max(Rim * 2.5 + Halo * 5 + 4, Radius);
     if (min(min(de.x, de.y), min(de.z, de.w)) > reach) return float4(0, 0, 0, Backdrop);   // the middle: nothing to draw
 
     // d follows the real corners for the line. u, the position along the edge, comes from a much
@@ -108,6 +108,11 @@ float4 PS(float4 pos : SV_Position) : SV_Target
     float d, u, ignore;
     EdgeCoords(pos.xy, Radius, d, ignore);
     EdgeCoords(pos.xy, reach * 2, ignore, u);
+
+    // with rounded corners, the bit of screen outside the curve is painted black (smooth edge),
+    // so the screen itself looks rounded and the light hugs a real-looking edge
+    float corner = Radius >= 1 ? saturate(0.5 - d) : 0;
+    float under = max(corner, Backdrop);
 
     // how lit this part of the edge is: the streams passing by (flat in the middle, tapered ends)
     float lit = Base;
@@ -117,7 +122,7 @@ float4 PS(float4 pos : SV_Position) : SV_Target
         lit += Streams[i].z * (1 - smoothstep(0.25, 1.0, du));
     }
     lit = saturate(lit);
-    if (lit < 0.003) return float4(0, 0, 0, Backdrop);
+    if (lit < 0.003 || Opacity < 0.002) return float4(0, 0, 0, under);
 
     // the line swells where a stream is strong and ripples as it flows
     float ripple = max(0.25, 1 + Wave * Waves(u, Time, 0));
@@ -143,6 +148,6 @@ float4 PS(float4 pos : SV_Position) : SV_Target
     float3 col = MixColors(Primary.rgb, Secondary.rgb, smoothstep(0.42, 0.88, g));
     col = lerp(col, 1, saturate(White * stroke * lit * 0.3));
 
-    // premultiplied and solid: the line covers what's under it with pure color
-    return float4(col * I, Backdrop > 0 ? 1 : I);
+    // premultiplied and solid: the line covers what's under it with pure color (over the black corner, if any)
+    return float4(col * I, I + (1 - I) * under);
 }

@@ -90,7 +90,7 @@ namespace LumnWin
         {
             var clock = Stopwatch.StartNew();
             bool shown = false, cleared = false;
-            double lastCheck = -1, lastTop = 0, lastFrame = 0;
+            double lastCheck = -1, lastTop = 0, lastFrame = 0, idleRadius = -1;
             bool? excluded = null;
 
             while (!_stop)
@@ -102,7 +102,7 @@ namespace LumnWin
                 {
                     lastCheck = t;
                     var b = Native.PrimaryMonitor();
-                    if (!b.Equals(_bounds)) { _bounds = b; Native.MoveTo(_hwnd, b); Resize(); }
+                    if (!b.Equals(_bounds)) { _bounds = b; Native.MoveTo(_hwnd, b); Resize(); cleared = false; }
                     _scale = Native.DpiScale(_hwnd);
                     bool ex = !_settings.ShowInCapture;
                     if (excluded != ex) { excluded = ex; Native.ExcludeFromCapture(_hwnd, ex); }
@@ -113,9 +113,15 @@ namespace LumnWin
                 if (!shown) { Thread.Sleep(100); continue; }
                 if (t - lastTop > 2) { lastTop = t; Native.BringToTop(_hwnd); }   // stay above the taskbar & co.
 
-                if (f.Opacity < 0.002)           // fully faded out: clear once, then idle cheaply
+                if (f.Opacity < 0.002)           // fully faded out: draw once (just the black corners, if rounded), then idle cheaply
                 {
-                    if (!cleared) { Clear(); Present(); cleared = true; }
+                    if (!cleared || f.Radius != idleRadius)
+                    {
+                        Draw(f);
+                        Present();
+                        cleared = true;
+                        idleRadius = f.Radius;
+                    }
                     Thread.Sleep(30);
                     continue;
                 }
@@ -198,8 +204,6 @@ namespace LumnWin
             _swap!.ResizeBuffers(2, (uint)Width, (uint)Height, Format.B8G8R8A8_UNorm, SwapChainFlags.None);
             CreateTarget();
         }
-
-        void Clear() => _ctx!.ClearRenderTargetView(_rtv!, new Color4(0, 0, 0, 0));
 
         void Draw(GlowFrame f)
         {
