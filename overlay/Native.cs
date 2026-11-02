@@ -113,6 +113,30 @@ namespace Penumbra
 
         public static double DpiScale(IntPtr hwnd) => Math.Max(1, GetDpiForWindow(hwnd)) / 96.0;
 
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+        struct DEVMODE
+        {
+            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)] public string dmDeviceName;
+            public short dmSpecVersion, dmDriverVersion, dmSize, dmDriverExtra;
+            public int dmFields, dmPositionX, dmPositionY, dmDisplayOrientation, dmDisplayFixedOutput;
+            public short dmColor, dmDuplex, dmYResolution, dmTTOption, dmCollate;
+            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)] public string dmFormName;
+            public short dmLogPixels;
+            public int dmBitsPerPel, dmPelsWidth, dmPelsHeight, dmDisplayFlags, dmDisplayFrequency;
+            public int dmICMMethod, dmICMIntent, dmMediaType, dmDitherType, dmReserved1, dmReserved2, dmPanningWidth, dmPanningHeight;
+        }
+
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+        static extern bool EnumDisplaySettingsW(string? device, int mode, ref DEVMODE dm);
+
+        /// <summary>The main screen's refresh rate in Hz (60 if Windows won't say).</summary>
+        public static int RefreshRate()
+        {
+            var dm = new DEVMODE { dmSize = (short)Marshal.SizeOf<DEVMODE>() };
+            return EnumDisplaySettingsW(null, -1 /* ENUM_CURRENT_SETTINGS */, ref dm) && dm.dmDisplayFrequency > 1
+                ? dm.dmDisplayFrequency : 60;
+        }
+
         public static Rect PrimaryMonitor()
         {
             var info = new MONITORINFO { cbSize = Marshal.SizeOf<MONITORINFO>() };

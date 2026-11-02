@@ -27,11 +27,23 @@ cbuffer Glow : register(b0)
 
 static const float TAU = 6.28318530718;
 
-// one triangle that covers the screen, no vertex buffer needed
+// how far from the edge any light can reach, px (GlowWindow.Reach does the same sum for its dirty rects)
+float Reach() { return max(Rim * 3.5 + Halo * 5 + 4, Radius); }
+
+// Four strips along the edges (4 quads = 24 vertices, no vertex buffer needed). The middle of the
+// screen is never drawn, which saves the GPU from shading millions of empty pixels every frame.
 float4 VS(uint id : SV_VertexID) : SV_Position
 {
-    float2 uv = float2((id << 1) & 2, id & 2);
-    return float4(uv * float2(2, -2) + float2(-1, 1), 0, 1);
+    float band = min(ceil(Reach()) + 2, min(Size.x, Size.y) * 0.5);
+    uint quad = id / 6, k = id % 6;
+    float2 c = float2(k == 1 || k == 4 || k == 5 ? 1 : 0, k == 2 || k == 3 || k == 5 ? 1 : 0);
+    float4 r;   // left, top, right, bottom in px
+    if (quad == 0)      r = float4(0, 0, Size.x, band);                            // top
+    else if (quad == 1) r = float4(0, Size.y - band, Size.x, Size.y);              // bottom
+    else if (quad == 2) r = float4(0, band, band, Size.y - band);                  // left
+    else                r = float4(Size.x - band, band, Size.x, Size.y - band);    // right
+    float2 p = lerp(r.xy, r.zw, c);
+    return float4(p.x / Size.x * 2 - 1, 1 - p.y / Size.y * 2, 0, 1);
 }
 
 // Coordinates relative to the edge of a rectangle with corners rounded by `radius`:
@@ -100,7 +112,7 @@ float4 PS(float4 pos : SV_Position) : SV_Target
 {
     // distance to each straight edge: top, right, bottom, left
     float4 de = float4(pos.y, Size.x - pos.x, Size.y - pos.y, pos.x);
-    float reach = max(Rim * 2.5 + Halo * 5 + 4, Radius);
+    float reach = Reach();
     if (min(min(de.x, de.y), min(de.z, de.w)) > reach) return float4(0, 0, 0, Backdrop);   // the middle: nothing to draw
 
     // d follows the real corners for the line. u, the position along the edge, comes from a much

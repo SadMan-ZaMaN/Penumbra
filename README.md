@@ -48,6 +48,7 @@ The top of the panel shows what's playing and the colors the glow is using right
 | Brightness | Overall intensity |
 | Waviness | How much the line's thickness ripples as the light flows (0 = even) |
 | Corners | Square (the default, light reaches right into the corners), rounded or very round |
+| Smoothness | How often the glow redraws. **Smooth**: every screen refresh. **Balanced** (default): every 2nd refresh on fast screens (45 fps at 90 Hz). **Saver**: about 30 fps |
 | Motion | **Music sync** reacts to the beat and only shows while there's sound. **Steady** is a calm, slow light that stays on |
 | Glow when nothing is playing | Keep a dim glow during silence instead of fading out |
 | Show lyrics | Synced lyric line above the taskbar (from lrclib.net) |

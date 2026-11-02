@@ -4,6 +4,7 @@ using System.IO;
 using System.Numerics;
 using System.Runtime.InteropServices;
 using System.Threading;
+using Vortice;
 using Vortice.D3DCompiler;
 using Vortice.Direct3D;
 using Vortice.Direct3D11;
@@ -41,6 +42,11 @@ namespace Penumbra
         IntPtr _hwnd;
         Native.Rect _bounds;
         double _scale = 1;   // pixels per DIP on this monitor
+        uint _sync = 1;      // present on every n-th screen refresh (Settings.Smoothness)
+        int _band;           // px: width of the edge strips drawn (all the light is inside them)
+        int _clearFrames;    // frames that must wipe the whole buffer first (one per swap chain buffer)
+        bool _fullPresent;   // this frame changed more than the edge strips
+        readonly RawRect[] _dirty = new RawRect[4];
         ID3D11Device? _device;
         ID3D11DeviceContext? _ctx;
         IDXGISwapChain1? _swap;
@@ -104,6 +110,13 @@ namespace Penumbra
                     var b = Native.PrimaryMonitor();
                     if (!b.Equals(_bounds)) { _bounds = b; Native.MoveTo(_hwnd, b); Resize(); cleared = false; }
                     _scale = Native.DpiScale(_hwnd);
+                    int hz = Native.RefreshRate();
+                    _sync = (uint)Math.Clamp(_settings.Smoothness switch
+                    {
+                        Smoothness.Smooth => 1,
+                        Smoothness.Saver => (int)Math.Round(hz / 30.0),
+                        _ => (int)Math.Round(hz / 60.0),
+                    }, 1, 4);
                     bool ex = !_settings.ShowInCapture;
                     if (excluded != ex) { excluded = ex; Native.ExcludeFromCapture(_hwnd, ex); }
                 }
@@ -113,7 +126,11 @@ namespace Penumbra
                 if (!shown) { Thread.Sleep(100); continue; }
                 if (t - lastTop > 2) { lastTop = t; Native.BringToTop(_hwnd); }   // stay above the taskbar & co.
 
-                if (f.Opacity < 0.002)           // fully faded out: draw once (just the black corners, if rounded), then idle cheaply
+                // nothing lit (faded out, or a gap between streams): draw once (just the black corners,
+                // if rounded), then idle cheaply until there's light again
+                bool lit = f.Base >= 0.003;
+                for (int i = 0; i < f.Streams.Length && !lit; i++) lit = f.Streams[i].Brightness >= 0.003;
+                if (f.Opacity < 0.002 || !lit)
                 {
                     if (!cleared || f.Radius != idleRadius)
                     {
@@ -129,7 +146,7 @@ namespace Penumbra
 
                 Draw(f);
                 Present();
-                // Present waits for the next screen refresh; this only guards against it not waiting
+                // Present waits for the screen refresh(es); this only guards against it not waiting
                 double spent = clock.Elapsed.TotalSeconds - lastFrame;
                 if (spent < 0.005) Thread.Sleep(1);
                 lastFrame = clock.Elapsed.TotalSeconds;
@@ -163,6 +180,7 @@ namespace Penumbra
             };
             _swap = factory.CreateSwapChainForComposition(_device, desc);
             CreateTarget();
+            _clearFrames = 2;
 
             // hand the swap chain to the desktop compositor as this window's content
             _dcomp = DComp.DCompositionCreateDevice<IDCompositionDevice>(dxgiDevice);
@@ -203,7 +221,12 @@ namespace Penumbra
             _rtv = null;
             _swap!.ResizeBuffers(2, (uint)Width, (uint)Height, Format.B8G8R8A8_UNorm, SwapChainFlags.None);
             CreateTarget();
+            _clearFrames = 2;
         }
+
+        /// <summary>Width of the edge strips, px. Must cover Reach() + the strips in Glow.hlsl's VS.</summary>
+        static int Band(in Constants c) =>
+            (int)Math.Min(Math.Ceiling(Math.Max(c.Rim * 3.5 + c.Halo * 5 + 4, c.Radius)) + 2, Math.Min(c.Size.X, c.Size.Y) / 2);
 
         void Draw(GlowFrame f)
         {
@@ -230,19 +253,45 @@ namespace Penumbra
                 Backdrop = _black ? 1 : 0,
             };
             var ctx = _ctx!;
+
+            // Only the edge strips get drawn; the middle of each buffer stays as it was cleared.
+            // When the strips change size (or the buffers are new) wipe each buffer once.
+            int band = Band(c);
+            if (band != _band) { _band = band; _clearFrames = 2; }
+            if (_black || _clearFrames > 0)
+            {
+                ctx.ClearRenderTargetView(_rtv!, new Color4(0, 0, 0, _black ? 1 : 0));
+                if (_clearFrames > 0) _clearFrames--;
+                _fullPresent = true;
+            }
+
             ctx.UpdateSubresource(in c, _cb!);
             ctx.OMSetRenderTargets(_rtv!);
             ctx.RSSetViewport(0, 0, Width, Height);
             ctx.IASetPrimitiveTopology(PrimitiveTopology.TriangleList);
             ctx.VSSetShader(_vs!);
+            ctx.VSSetConstantBuffer(0, _cb!);
             ctx.PSSetShader(_ps!);
             ctx.PSSetConstantBuffer(0, _cb!);
-            ctx.Draw(3, 0);
+            ctx.Draw(24, 0);   // 4 strips x 2 triangles
         }
 
         void Present()
         {
-            var hr = _swap!.Present(1, PresentFlags.None);
+            SharpGen.Runtime.Result hr;
+            if (_fullPresent)
+                hr = _swap!.Present(_sync, PresentFlags.None);
+            else
+            {
+                // tell the compositor only the edge strips changed, so it doesn't redo the whole screen
+                int w = Width, h = Height, b = Math.Min(_band + 2, Math.Min(w, h) / 2);
+                _dirty[0] = new RawRect(0, 0, w, b);
+                _dirty[1] = new RawRect(0, h - b, w, h);
+                _dirty[2] = new RawRect(0, b, b, h - b);
+                _dirty[3] = new RawRect(w - b, b, w, h - b);
+                hr = _swap!.Present1(_sync, PresentFlags.None, new PresentParameters { DirtyRectangles = _dirty });
+            }
+            _fullPresent = false;
             if (hr.Failure)   // GPU reset / driver update: start over
             {
                 ReleaseDevice();

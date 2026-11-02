@@ -29,6 +29,7 @@ from screen import AppVisibility, ScreenSampler
 
 BLOCK = 1024
 FPS = 60
+IDLE_STEP = 0.1         # seconds between updates while silent
 
 
 # --------------------------------------------------------------------------- audio sources
@@ -334,7 +335,8 @@ def main():
                       f"{np_state['title'][:30]:<30} {cur[:30]:<30}",
                       end="", flush=True)
 
-            next_t += frame
+            # nothing playing: 10 updates a second are plenty (and the glow is off anyway)
+            next_t += frame if (blocks or sound) else IDLE_STEP
             sleep = next_t - time.monotonic()
             if sleep > 0:
                 time.sleep(sleep)

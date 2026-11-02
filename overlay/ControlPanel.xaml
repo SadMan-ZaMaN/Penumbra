@@ -203,7 +203,7 @@
                     <ColumnDefinition/>
                 </Grid.ColumnDefinitions>
                 <Grid.RowDefinitions>
-                    <RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/>
+                    <RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/>
                 </Grid.RowDefinitions>
                 <TextBlock Grid.Row="0" Text="Thickness" Style="{StaticResource Label}"/>
                 <Slider x:Name="Thickness" Grid.Row="0" Grid.Column="1" Minimum="1" Maximum="20"/>
@@ -223,6 +223,12 @@
                 <WrapPanel x:Name="ModeChoices" Grid.Row="5" Grid.Column="1" Margin="0,2,0,0">
                     <RadioButton Style="{StaticResource Seg}" GroupName="mode" Tag="MusicSync" Content="Music sync"/>
                     <RadioButton Style="{StaticResource Seg}" GroupName="mode" Tag="Steady" Content="Steady" ToolTip="A calm glow that stays on, even without sound"/>
+                </WrapPanel>
+                <TextBlock Grid.Row="6" Text="Smoothness" Style="{StaticResource Label}" Margin="0,2,12,0" VerticalAlignment="Top"/>
+                <WrapPanel x:Name="SmoothChoices" Grid.Row="6" Grid.Column="1" Margin="0,2,0,0">
+                    <RadioButton Style="{StaticResource Seg}" GroupName="smooth" Tag="Smooth" Content="Smooth" ToolTip="Redraw on every screen refresh (most CPU and battery)"/>
+                    <RadioButton Style="{StaticResource Seg}" GroupName="smooth" Tag="Balanced" Content="Balanced" ToolTip="About 45 to 72 frames a second, depending on the screen"/>
+                    <RadioButton Style="{StaticResource Seg}" GroupName="smooth" Tag="Saver" Content="Saver" ToolTip="About 30 frames a second: least CPU and battery"/>
                 </WrapPanel>
             </Grid>
         </Border>

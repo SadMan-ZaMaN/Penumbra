@@ -51,6 +51,8 @@ namespace Penumbra
                 r.Checked += (_, _) => Set(() => _s.CornerRadius = double.Parse((string)r.Tag, CultureInfo.InvariantCulture));
             foreach (RadioButton r in ModeChoices.Children)
                 r.Checked += (_, _) => Set(() => _s.Mode = Enum.Parse<GlowMode>((string)r.Tag));
+            foreach (RadioButton r in SmoothChoices.Children)
+                r.Checked += (_, _) => Set(() => _s.Smoothness = Enum.Parse<Smoothness>((string)r.Tag));
             Thickness.ValueChanged += (_, e) => Set(() => _s.Thickness = e.NewValue);
             Glow.ValueChanged += (_, e) => Set(() => _s.Glow = e.NewValue);
             Brightness.ValueChanged += (_, e) => Set(() => _s.Brightness = e.NewValue);
@@ -116,6 +118,7 @@ namespace Penumbra
             foreach (RadioButton r in CornerChoices.Children)
                 r.IsChecked = Math.Abs(double.Parse((string)r.Tag, CultureInfo.InvariantCulture) - _s.CornerRadius) < 0.5;
             foreach (RadioButton r in ModeChoices.Children) r.IsChecked = (string)r.Tag == _s.Mode.ToString();
+            foreach (RadioButton r in SmoothChoices.Children) r.IsChecked = (string)r.Tag == _s.Smoothness.ToString();
             Thickness.Value = _s.Thickness;
             Glow.Value = _s.Glow;
             Brightness.Value = _s.Brightness;

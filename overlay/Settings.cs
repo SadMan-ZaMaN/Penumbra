@@ -7,6 +7,14 @@ namespace Penumbra
 {
     public enum GlowMode { MusicSync, Steady }
 
+    /// <summary>How often the glow redraws. Fewer frames = less CPU, GPU and battery.</summary>
+    public enum Smoothness
+    {
+        Smooth,     // every screen refresh
+        Balanced,   // every 2nd refresh on fast screens (45 fps at 90 Hz, 60 at 60 or 120 Hz)
+        Saver,      // about 30 fps
+    }
+
     /// <summary>Where the glow's colors come from. The engine reads this from settings.json too.</summary>
     public enum ColorSource
     {
@@ -26,6 +34,7 @@ namespace Penumbra
         public double Brightness { get; set; } = 1.0;   // 0..1
         public double Waviness { get; set; } = 1.0;     // how much the line's thickness ripples: 0 = even, 2 = a lot
         public double CornerRadius { get; set; } = 0;   // px; 0 = square corners, light reaches right into them
+        public Smoothness Smoothness { get; set; } = Smoothness.Balanced;
         public ColorSource ColorSource { get; set; } = ColorSource.Auto;
         public bool HiddenVideoThumbnail { get; set; } = false;   // Auto: a minimized / covered video uses its thumbnail, not the screen
         public string Primary { get; set; } = "#7c5cff";
@@ -35,7 +44,7 @@ namespace Penumbra
         public bool ShowInCapture { get; set; } = false; // visible in screenshots / recordings
 
         /// <summary>Back to the default look: automatic colors, default thickness, glow, brightness,
-        /// waviness, corners and motion. Behaviour switches (lyrics, start with Windows...) stay as they are.</summary>
+        /// waviness, corners, motion and smoothness. Behaviour switches (lyrics, start with Windows...) stay as they are.</summary>
         public void ResetLook()
         {
             var d = new Settings();
@@ -45,6 +54,7 @@ namespace Penumbra
             Brightness = d.Brightness;
             Waviness = d.Waviness;
             CornerRadius = d.CornerRadius;
+            Smoothness = d.Smoothness;
             ColorSource = d.ColorSource;
             Primary = d.Primary;
             Secondary = d.Secondary;
