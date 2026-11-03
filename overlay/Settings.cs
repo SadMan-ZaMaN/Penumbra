@@ -41,6 +41,7 @@ namespace Penumbra
         public string Secondary { get; set; } = "#ff4fa3";
         public bool IdleGlow { get; set; } = false;     // dim glow when nothing is playing (off: screen looks normal)
         public bool ShowLyrics { get; set; } = false;
+        public LyricsStyle LyricsStyle { get; set; } = LyricsStyle.Flow;
         public bool ShowInCapture { get; set; } = false; // visible in screenshots / recordings
 
         /// <summary>Back to the default look: automatic colors, default thickness, glow, brightness,

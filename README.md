@@ -51,7 +51,7 @@ The top of the panel shows what's playing and the colors the glow is using right
 | Smoothness | How often the glow redraws. **Smooth**: every screen refresh. **Balanced** (default): every 2nd refresh on fast screens (45 fps at 90 Hz). **Saver**: about 30 fps |
 | Motion | **Music sync** reacts to the beat and only shows while there's sound. **Steady** is a calm, slow light that stays on |
 | Glow when nothing is playing | Keep a dim glow during silence instead of fading out |
-| Show lyrics | Synced lyric line above the taskbar (from lrclib.net) |
+| Show lyrics | Synced lyrics (from lrclib.net). **Flow**: one big bold line above the taskbar, a soft sweep filling it in white as it's sung, the next line dim below, old lines blurring away (like Apple Music). **Constellation**: each word appears as a star joined to the last, the word being sung big and bright |
 | Show in screenshots & recordings | Off by default, so the screen sampling never sees the glow itself. Turn it on to record a demo of the glow |
 | Start with Windows | Adds or removes a registry Run entry |
 | ↻ (bottom right) | Resets the look: Auto colors, and default thickness, glow, brightness, waviness, corners and motion. The switches above stay as they are |
@@ -83,7 +83,7 @@ overlay/
   GlowWindow.cs     the full-screen click-through window + Direct3D 11 / DirectComposition
   ControlPanel.xaml the settings window (layout + styles); ControlPanel.xaml.cs wires it up
   Glow.hlsl         the look itself: rim, bloom, haze, waves, colors (runs on the GPU)
-  LyricsWindow.cs   karaoke line
+  LyricsRenderer.cs the lyrics (Flow / Constellation), drawn with Direct2D into the glow window
   Tray.cs           tray icon + menu
   Native.cs         Win32: click-through, no taskbar entry, always on top, hidden from capture
 ```

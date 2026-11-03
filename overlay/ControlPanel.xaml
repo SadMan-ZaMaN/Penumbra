@@ -239,6 +239,10 @@
             <StackPanel>
                 <CheckBox x:Name="IdleGlow" Style="{StaticResource Switch}" Content="Glow when nothing is playing"/>
                 <CheckBox x:Name="ShowLyrics" Style="{StaticResource Switch}" Content="Show lyrics"/>
+                <WrapPanel x:Name="LyricsChoices" Margin="0,2,0,2">
+                    <RadioButton Style="{StaticResource Seg}" GroupName="lyrics" Tag="Flow" Content="Flow" ToolTip="The line above the taskbar, words lighting up as they're sung"/>
+                    <RadioButton Style="{StaticResource Seg}" GroupName="lyrics" Tag="Constellation" Content="Constellation" ToolTip="Words appear as stars joined by lines, the current word big"/>
+                </WrapPanel>
                 <CheckBox x:Name="ShowInCapture" Style="{StaticResource Switch}" Content="Show in screenshots &amp; recordings"/>
                 <CheckBox x:Name="AutoStart" Style="{StaticResource Switch}" Content="Start with Windows"/>
             </StackPanel>

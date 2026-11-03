@@ -90,18 +90,31 @@ class Lyrics:
         threading.Thread(target=work, daemon=True).start()
 
     def at(self, position, offset=0.0):
-        """(current_line, next_line, progress 0..1 through current line) at `position` seconds."""
+        """Where the song is in its lyrics at `position` seconds:
+        (current line, next line, progress 0..1 through the line, line index (-1 = none),
+         seconds into the line, estimated seconds it takes to sing the line)."""
         with self._lock:
             if not self._lines:
-                return "", "", 0.0
+                return "", "", 0.0, -1, 0.0, 0.0
             p = position + offset
             i = bisect.bisect_right(self._times, p) - 1
             if i < 0:
-                return "", self._lines[0][1], 0.0
+                return "", self._lines[0][1], 0.0, -1, 0.0, 0.0
             cur_t, cur = self._lines[i]
             if i + 1 < len(self._lines):
                 nxt_t, nxt = self._lines[i + 1]
-                prog = (p - cur_t) / max(0.1, nxt_t - cur_t)
+                gap = max(0.1, nxt_t - cur_t)
+                prog = (p - cur_t) / gap
             else:
-                nxt, prog = "", 0.0
-            return cur, nxt, max(0.0, min(1.0, prog))
+                nxt, gap, prog = "", None, 0.0
+            return cur, nxt, max(0.0, min(1.0, prog)), i, p - cur_t, sung_duration(cur, gap)
+
+
+def sung_duration(line, gap):
+    """Rough time to sing a line, for lighting its words up one by one (LRC only times whole lines).
+    About 14 characters a second; when the next line starts sooner, squeeze into that gap. A long
+    gap usually means an instrumental break after the line, so don't stretch the words over it."""
+    est = 0.4 + 0.07 * len(line)
+    if gap is None:
+        return est
+    return min(0.92 * gap, max(est, min(0.6 * gap, 1.6 * est)))

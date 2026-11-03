@@ -60,6 +60,8 @@ namespace Penumbra
             IdleGlow.Click += (_, _) => Set(() => _s.IdleGlow = IdleGlow.IsChecked == true);
             HiddenVideoThumbnail.Click += (_, _) => Set(() => _s.HiddenVideoThumbnail = HiddenVideoThumbnail.IsChecked == true);
             ShowLyrics.Click += (_, _) => Set(() => _s.ShowLyrics = ShowLyrics.IsChecked == true);
+            foreach (RadioButton r in LyricsChoices.Children)
+                r.Checked += (_, _) => Set(() => _s.LyricsStyle = Enum.Parse<LyricsStyle>((string)r.Tag));
             ShowInCapture.Click += (_, _) => Set(() => _s.ShowInCapture = ShowInCapture.IsChecked == true);
             AutoStart.Click += (_, _) => Tray.SetAutoStart(AutoStart.IsChecked == true);
             PrimarySwatch.Click += (_, _) => Pick(true);
@@ -128,6 +130,7 @@ namespace Penumbra
             IdleGlow.IsChecked = _s.IdleGlow;
             HiddenVideoThumbnail.IsChecked = _s.HiddenVideoThumbnail;
             ShowLyrics.IsChecked = _s.ShowLyrics;
+            foreach (RadioButton r in LyricsChoices.Children) r.IsChecked = (string)r.Tag == _s.LyricsStyle.ToString();
             ShowInCapture.IsChecked = _s.ShowInCapture;
             AutoStart.IsChecked = Tray.IsAutoStart();
             _loading = false;

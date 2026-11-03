@@ -106,7 +106,6 @@ namespace Penumbra
         void Changed()
         {
             _s.Save();
-            _glow.ApplyLayout();
             if (_panel.IsVisible) _panel.Load();   // a change from this menu shows in the open panel too
         }
 

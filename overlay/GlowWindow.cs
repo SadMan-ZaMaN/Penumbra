@@ -6,11 +6,13 @@ using System.Runtime.InteropServices;
 using System.Threading;
 using Vortice;
 using Vortice.D3DCompiler;
+using Vortice.Direct2D1;
 using Vortice.Direct3D;
 using Vortice.Direct3D11;
 using Vortice.DirectComposition;
 using Vortice.DXGI;
 using Vortice.Mathematics;
+using FeatureLevel = Vortice.Direct3D.FeatureLevel;
 
 namespace Penumbra
 {
@@ -46,7 +48,14 @@ namespace Penumbra
         int _band;           // px: width of the edge strips drawn (all the light is inside them)
         int _clearFrames;    // frames that must wipe the whole buffer first (one per swap chain buffer)
         bool _fullPresent;   // this frame changed more than the edge strips
-        readonly RawRect[] _dirty = new RawRect[4];
+        readonly RawRect[] _dirty = new RawRect[4], _dirtyWithLyrics = new RawRect[5];
+        RawRect? _lyricsArea;  // px that may hold lyrics in either buffer (cleared each frame)
+        int _lyricsClear;      // frames left to wipe _lyricsArea after the lyrics are gone
+        ID2D1Factory1? _d2dFactory;
+        ID2D1Device? _d2dDevice;
+        ID2D1DeviceContext? _d2d;
+        ID2D1Bitmap1? _d2dTarget;   // the back buffer, as something Direct2D can draw into
+        LyricsRenderer? _lyrics;
         ID3D11Device? _device;
         ID3D11DeviceContext? _ctx;
         IDXGISwapChain1? _swap;
@@ -88,6 +97,8 @@ namespace Penumbra
             finally
             {
                 ReleaseDevice();
+                _lyrics?.Dispose();
+                _d2dFactory?.Dispose();
                 if (_hwnd != IntPtr.Zero) Native.DestroyWindow(_hwnd);
             }
         }
@@ -96,8 +107,9 @@ namespace Penumbra
         {
             var clock = Stopwatch.StartNew();
             bool shown = false, cleared = false;
-            double lastCheck = -1, lastTop = 0, lastFrame = 0, idleRadius = -1;
+            double lastCheck = -1, lastTop = 0, lastFrame = 0, idleRadius = -1, lastT = 0;
             bool? excluded = null;
+            Native.Rect work = default;      // the main screen minus the taskbar, relative to the window
 
             while (!_stop)
             {
@@ -119,18 +131,25 @@ namespace Penumbra
                     }, 1, 4);
                     bool ex = !_settings.ShowInCapture;
                     if (excluded != ex) { excluded = ex; Native.ExcludeFromCapture(_hwnd, ex); }
+                    var wa = Native.PrimaryWorkArea();
+                    work = new Native.Rect { Left = wa.Left - b.Left, Top = wa.Top - b.Top, Right = wa.Right - b.Left, Bottom = wa.Bottom - b.Top };
                 }
 
                 var f = _ctl.Update(t);
+                double dt = Math.Clamp(t - lastT, 0, 0.1);
+                lastT = t;
+                var style = _settings.LyricsStyle;
+                _lyrics?.Update(_ctl.Last, _settings.ShowLyrics && _ctl.Last?.sound == true, style,
+                                LyricsRenderer.RegionFor(style, work, _scale), dt, _scale);
                 if (_settings.Enabled != shown) { shown = _settings.Enabled; Native.Show(_hwnd, shown); }
                 if (!shown) { Thread.Sleep(100); continue; }
                 if (t - lastTop > 2) { lastTop = t; Native.BringToTop(_hwnd); }   // stay above the taskbar & co.
 
                 // nothing lit (faded out, or a gap between streams): draw once (just the black corners,
                 // if rounded), then idle cheaply until there's light again
-                bool lit = f.Base >= 0.003;
+                bool lit = f.Base >= 0.003 || _lyrics?.Active == true || _lyricsClear > 0;
                 for (int i = 0; i < f.Streams.Length && !lit; i++) lit = f.Streams[i].Brightness >= 0.003;
-                if (f.Opacity < 0.002 || !lit)
+                if ((f.Opacity < 0.002 && _lyrics?.Active != true && _lyricsClear == 0) || !lit)
                 {
                     if (!cleared || f.Radius != idleRadius)
                     {
@@ -196,6 +215,23 @@ namespace Penumbra
             _vs = _device.CreateVertexShader(vsCode.Span);
             _ps = _device.CreatePixelShader(psCode.Span);
             _cb = _device.CreateBuffer(new BufferDescription((uint)Marshal.SizeOf<Constants>(), BindFlags.ConstantBuffer));
+
+            // Direct2D on the same GPU device, for the lyrics
+            _d2dFactory ??= D2D1.D2D1CreateFactory<ID2D1Factory1>(Vortice.Direct2D1.FactoryType.SingleThreaded);
+            _d2dDevice = _d2dFactory.CreateDevice(dxgiDevice);
+            _d2d = _d2dDevice.CreateDeviceContext(DeviceContextOptions.None);
+            _d2d.SetDpi(96, 96);   // work in pixels
+            CreateD2DTarget();
+            _lyrics ??= new LyricsRenderer(_d2dFactory);
+            _lyrics.Attach(_d2d);
+        }
+
+        void CreateD2DTarget()
+        {
+            using var surface = _swap!.GetBuffer<IDXGISurface>(0);
+            _d2dTarget = _d2d!.CreateBitmapFromDxgiSurface(surface, new BitmapProperties1(
+                new Vortice.DCommon.PixelFormat(Format.B8G8R8A8_UNorm, Vortice.DCommon.AlphaMode.Premultiplied),
+                96, 96, BitmapOptions.Target | BitmapOptions.CannotDraw));
         }
 
         static string LoadShader()
@@ -219,9 +255,14 @@ namespace Penumbra
         {
             _rtv?.Dispose();
             _rtv = null;
+            _d2d!.Target = null;
+            _d2dTarget?.Dispose();
+            _d2dTarget = null;
             _swap!.ResizeBuffers(2, (uint)Width, (uint)Height, Format.B8G8R8A8_UNorm, SwapChainFlags.None);
             CreateTarget();
+            CreateD2DTarget();
             _clearFrames = 2;
+            _lyricsArea = null;
         }
 
         /// <summary>Width of the edge strips, px. Must cover Reach() + the strips in Glow.hlsl's VS.</summary>
@@ -264,7 +305,19 @@ namespace Penumbra
                 if (_clearFrames > 0) _clearFrames--;
                 _fullPresent = true;
             }
+            else if (_lyricsArea is RawRect area)   // wipe last frame's lyrics before drawing anything
+            {
+                var d2d = _d2d!;
+                d2d.Target = _d2dTarget;
+                d2d.BeginDraw();
+                d2d.Transform = Matrix3x2.Identity;
+                d2d.PushAxisAlignedClip(new RawRectF(area.Left, area.Top, area.Right, area.Bottom), AntialiasMode.Aliased);
+                d2d.Clear(new Color4(0, 0, 0, 0));
+                d2d.PopAxisAlignedClip();
+                d2d.EndDraw();
+            }
 
+            ctx.ClearState();   // Direct2D shares the GPU; start the glow pass from a clean slate
             ctx.UpdateSubresource(in c, _cb!);
             ctx.OMSetRenderTargets(_rtv!);
             ctx.RSSetViewport(0, 0, Width, Height);
@@ -274,7 +327,22 @@ namespace Penumbra
             ctx.PSSetShader(_ps!);
             ctx.PSSetConstantBuffer(0, _cb!);
             ctx.Draw(24, 0);   // 4 strips x 2 triangles
+
+            // lyrics on top of the glow
+            if (_lyrics != null && _lyrics.Active)
+            {
+                _lyrics.Draw(_d2dTarget!, f.Primary, _scale);
+                if (_lyrics.Drawn is RawRect drawn)
+                {
+                    _lyricsArea = _lyricsArea is RawRect old ? Union(old, drawn) : drawn;
+                    _lyricsClear = 2;   // after they're gone, wipe the area in both buffers
+                }
+            }
+            else if (_lyricsClear > 0 && --_lyricsClear == 0) _lyricsArea = null;
         }
+
+        static RawRect Union(RawRect a, RawRect b) =>
+            new(Math.Min(a.Left, b.Left), Math.Min(a.Top, b.Top), Math.Max(a.Right, b.Right), Math.Max(a.Bottom, b.Bottom));
 
         void Present()
         {
@@ -289,7 +357,14 @@ namespace Penumbra
                 _dirty[1] = new RawRect(0, h - b, w, h);
                 _dirty[2] = new RawRect(0, b, b, h - b);
                 _dirty[3] = new RawRect(w - b, b, w, h - b);
-                hr = _swap!.Present1(_sync, PresentFlags.None, new PresentParameters { DirtyRectangles = _dirty });
+                var rects = _dirty;
+                if (_lyricsArea is RawRect area)   // ...plus the lyrics
+                {
+                    Array.Copy(_dirty, _dirtyWithLyrics, 4);
+                    _dirtyWithLyrics[4] = new RawRect(Math.Max(0, area.Left), Math.Max(0, area.Top), Math.Min(w, area.Right), Math.Min(h, area.Bottom));
+                    rects = _dirtyWithLyrics;
+                }
+                hr = _swap!.Present1(_sync, PresentFlags.None, new PresentParameters { DirtyRectangles = rects });
             }
             _fullPresent = false;
             if (hr.Failure)   // GPU reset / driver update: start over
@@ -301,6 +376,10 @@ namespace Penumbra
 
         void ReleaseDevice()
         {
+            if (_d2d != null) _d2d.Target = null;
+            _d2dTarget?.Dispose(); _d2d?.Dispose(); _d2dDevice?.Dispose();
+            _d2dTarget = null; _d2d = null; _d2dDevice = null;
+            _lyricsArea = null; _lyricsClear = 0;
             _cb?.Dispose(); _ps?.Dispose(); _vs?.Dispose(); _rtv?.Dispose();
             _visual?.Dispose(); _target?.Dispose(); _dcomp?.Dispose();
             _swap?.Dispose(); _ctx?.Dispose(); _device?.Dispose();

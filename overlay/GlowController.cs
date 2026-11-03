@@ -1,7 +1,5 @@
 using System;
-using System.Windows;
 using System.Windows.Media;
-using System.Windows.Threading;
 
 namespace Penumbra
 {
@@ -13,8 +11,8 @@ namespace Penumbra
         public GlowController.Stream[] Streams = Array.Empty<GlowController.Stream>();
     }
 
-    /// <summary>Turns engine packets + settings into smooth per-frame light.
-    /// Update() runs on the glow's render thread; the lyrics line is driven from the UI thread.</summary>
+    /// <summary>Turns engine packets + settings into smooth per-frame light. Update() runs on the
+    /// glow's render thread (which also draws the lyrics, see LyricsRenderer).</summary>
     public class GlowController
     {
         /// <summary>A stretch of light that grows, travels along the edge and fades.
@@ -29,7 +27,6 @@ namespace Penumbra
 
         readonly Settings _settings;
         readonly EngineLink _link;
-        readonly LyricsWindow _lyrics = new();
         readonly Random _rng = new();
         double _lastT = -1;
 
@@ -50,21 +47,6 @@ namespace Penumbra
             _primary = Parse(settings.Primary, Colors.MediumPurple);
             _secondary = Parse(settings.Secondary, Colors.HotPink);
             _frame.Streams = new Stream[MaxStreams];
-
-            ApplyLayout();
-            Microsoft.Win32.SystemEvents.DisplaySettingsChanged += (_, _) =>
-                Application.Current.Dispatcher.BeginInvoke(new Action(ApplyLayout));
-
-            var lyricsTimer = new DispatcherTimer(DispatcherPriority.Render) { Interval = TimeSpan.FromMilliseconds(33) };
-            lyricsTimer.Tick += (_, _) => UpdateLyrics();
-            lyricsTimer.Start();
-        }
-
-        /// <summary>Call after changing settings or when displays change.</summary>
-        public void ApplyLayout()
-        {
-            _lyrics.Place(SystemParameters.WorkArea);
-            if (_lyrics.Handle != IntPtr.Zero) Native.ExcludeFromCapture(_lyrics.Handle, !_settings.ShowInCapture);
         }
 
         /// <summary>Advance to time t (seconds) and return the frame to draw.</summary>
@@ -206,20 +188,6 @@ namespace Penumbra
                 Strength = big ? 1.0 : 0.75 + 0.25 * _rng.NextDouble(),
                 Life = calm ? 6 + 4 * _rng.NextDouble() : 1.4 + 1.8 * _rng.NextDouble(),
             };
-        }
-
-        void UpdateLyrics()
-        {
-            var s = Last;
-            bool show = _settings.Enabled && _settings.ShowLyrics && s != null && s.sound
-                        && !string.IsNullOrEmpty(s.lyric + s.next);
-            if (show && !_lyrics.IsVisible)
-            {
-                _lyrics.Show();
-                Native.ExcludeFromCapture(_lyrics.Handle, !_settings.ShowInCapture);
-            }
-            if (!show && _lyrics.IsVisible) _lyrics.Hide();
-            if (show) _lyrics.Render(s!.lyric, s.next, _primary, _pulse);
         }
 
         static double Wrap(double x) => x - Math.Floor(x);

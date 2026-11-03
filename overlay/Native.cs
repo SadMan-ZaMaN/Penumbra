@@ -144,6 +144,14 @@ namespace Penumbra
             return info.rcMonitor;
         }
 
+        /// <summary>The main screen minus the taskbar.</summary>
+        public static Rect PrimaryWorkArea()
+        {
+            var info = new MONITORINFO { cbSize = Marshal.SizeOf<MONITORINFO>() };
+            GetMonitorInfoW(MonitorFromPoint(0, 1 /* MONITOR_DEFAULTTOPRIMARY */), ref info);
+            return info.rcWork;
+        }
+
         /// <summary>A borderless, click-through, topmost window with no pixels of its own:
         /// DirectComposition puts the GPU-drawn glow (with per-pixel alpha) on screen.</summary>
         public static IntPtr CreateGlowWindow(WndProc proc, Rect r)

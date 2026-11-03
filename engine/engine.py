@@ -7,7 +7,8 @@
 Sends ~60 JSON packets/s over UDP to 127.0.0.1:47800, e.g.
     {"level":0.62,"bass":0.8,"mid":0.4,"high":0.2,"pulse":1.0,"beat":true,"bpm":124.0,
      "colors":["#7c5cff","#ff4fa3"],"source":"art","kind":"music","sound":true,"playing":true,
-     "title":"...","artist":"...","lyric":"current line","next":"next line","lprog":0.4}
+     "title":"...","artist":"...","lyric":"current line","next":"next line","lprog":0.4,
+     "lidx":12,"lt":1.3,"ld":2.6}   (line index, seconds into the line, est. seconds to sing it)
 """
 import argparse
 import json
@@ -23,7 +24,7 @@ import numpy as np
 
 from colors import DEFAULT, dominant_colors
 from dsp import BeatDetector
-from lyrics import Lyrics
+from lyrics import Lyrics, sung_duration
 from media import NowPlaying, is_placeholder
 from screen import AppVisibility, ScreenSampler
 
@@ -209,6 +210,22 @@ def choose_source(setting, kind, playing):
     return "screen" if kind == "video" or (kind == "none" and playing) else "art"
 
 
+DEMO_LINES = [
+    "Lights come alive along the edges of the night",
+    "Every beat you feel is turning into light",
+    "Hold on to the colors as they fade away",
+    "We were never meant to stay",
+]
+
+
+def demo_lyrics(now, every=3.6):
+    """Made-up lyric lines for --demo, so the lyrics can be tested without music."""
+    i = int(now // every)
+    cur, nxt = DEMO_LINES[i % len(DEMO_LINES)], DEMO_LINES[(i + 1) % len(DEMO_LINES)]
+    lt = now - i * every
+    return cur, nxt, lt / every, i, lt, sung_duration(cur, every)
+
+
 def watch_parent(pid):
     """Quit when the overlay quits (or crashes), so no orphan engine keeps running."""
     import os
@@ -289,7 +306,9 @@ def main():
             hidden = is_placeholder(np_state["title"], np_state["artist"])   # Incognito: no real title
             lyrics.set_track(np_state["artist"], "" if hidden else np_state["title"],
                              np_state["album"], np_state["duration"])
-            cur, nxt, prog = lyrics.at(np_state["position"], args.lyrics_offset)
+            cur, nxt, prog, lidx, lt, ld = lyrics.at(np_state["position"], args.lyrics_offset)
+            if args.demo and not np_state["title"]:
+                cur, nxt, prog, lidx, lt, ld = demo_lyrics(now)
 
             # ---- colors: album art for music, the screen for videos (or what the tray says)
             sound = det.sound(now) or args.demo
@@ -323,6 +342,7 @@ def main():
                 "sound": sound, "playing": bool(np_state["playing"]) or args.demo,
                 "title": np_state["title"], "artist": np_state["artist"],
                 "lyric": cur, "next": nxt, "lprog": round(prog, 3),
+                "lidx": lidx, "lt": round(lt, 3), "ld": round(ld, 3),
             }
             sock.sendto(json.dumps(pkt, ensure_ascii=False).encode("utf-8"), addr)
 

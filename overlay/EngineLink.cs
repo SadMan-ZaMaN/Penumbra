@@ -29,6 +29,9 @@ namespace Penumbra
         public string lyric { get; set; } = "";
         public string next { get; set; } = "";
         public double lprog { get; set; }
+        public int lidx { get; set; } = -1;   // which lyric line (a repeated chorus line still counts as new)
+        public double lt { get; set; }         // seconds into the line
+        public double ld { get; set; }         // estimated seconds it takes to sing the line
     }
 
     /// <summary>Receives engine packets on UDP 127.0.0.1:port on a background thread.</summary>
