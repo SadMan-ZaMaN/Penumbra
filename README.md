@@ -93,7 +93,7 @@ Then play something: Spotify, YouTube in a browser, or any app that shows up in 
 
 ### Night sky
 
-Night sky blacks out the **whole display**, taskbar included, while a song with lyrics plays. It fades back to your desktop when the music stops.
+Night sky blacks out the **whole display**, taskbar included, while a song with lyrics plays. It stays black through instrumental breaks and from one song to the next, and fades back to your desktop when you pause or a song without lyrics comes on.
 - **Press Esc** to lift the black: the lyrics carry on as Constellation. Esc again brings the black back, and the next song starts black again.
 - **Auto-hidden taskbar?** Point at the screen edge as usual and it slides out over the black.
 - Your apps keep running under the black, and clicks still reach them.

@@ -139,11 +139,14 @@ namespace Penumbra
         /// <summary>How visible the lyrics are right now, 0..1 (fades in and out).</summary>
         public double Visibility => _alpha;
 
-        /// <summary>Like <see cref="Visibility"/>, but it stays up through breaks between lines (an
-        /// instrumental bit), so Night sky's black lasts the whole song instead of blinking off at
-        /// every gap. Down again when the song's lines run out, or the music stops.</summary>
+        /// <summary>Night sky's black, 0..1. It comes up with the first sung line, then stays while the
+        /// music plays on: through breaks between lines, the outro, the switch to the next song and its
+        /// intro, as long as the songs have lyrics (or they're still being looked up). It goes when the
+        /// music is paused, or a few seconds into a song without lyrics.</summary>
         public double SongVisibility => _songAlpha;
         double _songAlpha;
+        bool _night;     // Night sky is on (before the fade)
+        double _lapse;   // seconds without a reason to stay; a little grace for hiccups between songs
 
         /// <summary>Follow the engine's lyric state. <paramref name="show"/> = lyrics switched on and sound playing;
         /// <paramref name="region"/> = where the lyrics go (see <see cref="RegionFor"/>).</summary>
@@ -161,9 +164,13 @@ namespace Penumbra
 
             bool has = show && s != null && !string.IsNullOrWhiteSpace(s.lyric);
             _alpha += ((has ? 1 : 0) - _alpha) * (1 - Math.Exp(-(has ? 6 : 4) * dt));
-            // a break: an empty line, after the singing started (lidx >= 0), with another line still to come
-            bool inSong = has || show && s != null && s.lidx >= 0 && !string.IsNullOrWhiteSpace(s.next);
-            _songAlpha += ((inSong ? 1 : 0) - _songAlpha) * (1 - Math.Exp(-(inSong ? 6 : 4) * dt));
+            // reasons to stay: this song has lyrics or they're being looked up, or (for --demo, which has
+            // no lookups) it's a break after the singing started with another line still to come
+            bool keep = s != null && s.playing && (s.lstat is "found" or "searching"
+                                                   || s.lidx >= 0 && !string.IsNullOrWhiteSpace(s.next));
+            _lapse = keep ? 0 : _lapse + dt;
+            _night = has || _night && _lapse < 2.5;
+            _songAlpha += ((_night ? 1 : 0) - _songAlpha) * (1 - Math.Exp(-(_night ? 6 : 4) * dt));
 
             if (has && (_current == null || _current.Index != s!.lidx || _current.Text != s.lyric || _current.Style != style))
             {

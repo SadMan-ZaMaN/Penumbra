@@ -58,6 +58,7 @@ namespace Penumbra
         Native.Rect _work;     // the main screen minus the taskbar, relative to the window
         double _backdrop;      // Night sky: how black the screen is right now, 0..1
         Native.Rect _darkRect; // which part goes black: the whole screen, or all but a slid-out taskbar
+        string _song = "";     // the song playing, so Esc's lift of the black ends with it
 
         /// <summary>The screen is (going) black for Night sky (the safety net watches this).</summary>
         public bool DarkActive => _backdrop > 0.01;
@@ -72,7 +73,7 @@ namespace Penumbra
         public double SinceLastFrame => Stopwatch.GetElapsedTime(Interlocked.Read(ref _heartbeat)).TotalSeconds;
 
         /// <summary>Esc during Night sky: lift the black (the lyrics stay, like Constellation) until Esc
-        /// again, or until the lyrics end. The saved style stays Night sky.</summary>
+        /// again, or the next song. The saved style stays Night sky.</summary>
         public volatile bool BlackLifted;
         ID2D1Factory1? _d2dFactory;
         ID2D1Device? _d2dDevice;
@@ -211,8 +212,10 @@ namespace Penumbra
         /// (or after Esc).</summary>
         void FollowNightSky(LyricsStyle style, double dt)
         {
-            double lyrics = !_black && style == LyricsStyle.NightSky ? _lyrics?.SongVisibility ?? 0 : 0;
-            if (lyrics < 0.003) BlackLifted = false;   // the song's lyrics are over: the next song starts black again
+            double lyrics = !_black && style == LyricsStyle.NightSky && _settings.ShowLyrics ? _lyrics?.SongVisibility ?? 0 : 0;
+            var song = _ctl.Last?.title ?? "";
+            if (lyrics < 0.003 || song != _song) BlackLifted = false;   // Night sky is over, or a new song: black again
+            _song = song;
             double target = BlackLifted ? 0 : lyrics;
             double b = _backdrop + (target - _backdrop) * (1 - Math.Exp(-2.5 * dt));
             if (Math.Abs(b - target) < 0.003) b = target;
