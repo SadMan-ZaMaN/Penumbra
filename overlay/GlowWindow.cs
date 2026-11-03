@@ -211,8 +211,8 @@ namespace Penumbra
         /// (or after Esc).</summary>
         void FollowNightSky(LyricsStyle style, double dt)
         {
-            double lyrics = !_black && style == LyricsStyle.NightSky ? _lyrics?.Visibility ?? 0 : 0;
-            if (lyrics < 0.003) BlackLifted = false;   // the lyrics are gone: the next ones start black again
+            double lyrics = !_black && style == LyricsStyle.NightSky ? _lyrics?.SongVisibility ?? 0 : 0;
+            if (lyrics < 0.003) BlackLifted = false;   // the song's lyrics are over: the next song starts black again
             double target = BlackLifted ? 0 : lyrics;
             double b = _backdrop + (target - _backdrop) * (1 - Math.Exp(-2.5 * dt));
             if (Math.Abs(b - target) < 0.003) b = target;
