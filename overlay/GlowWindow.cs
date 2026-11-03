@@ -57,9 +57,9 @@ namespace Penumbra
         RawRect? _lyricsDirty;  // what changed this frame because of the lyrics (for the compositor)
         Native.Rect _work;     // the main screen minus the taskbar, relative to the window
         double _backdrop;      // Night sky: how black the screen is right now, 0..1
-        Native.Rect _darkRect; // which part goes black: the whole screen, or all but the taskbar
+        Native.Rect _darkRect; // which part goes black: the whole screen, or all but a slid-out taskbar
 
-        /// <summary>The screen is (going) black for Night sky, so Esc should be able to bring back the taskbar.</summary>
+        /// <summary>The screen is (going) black for Night sky (the safety net watches this).</summary>
         public bool DarkActive => _backdrop > 0.01;
 
         /// <summary>The glow window, for the Night sky safety net (Program.cs).</summary>
@@ -71,8 +71,9 @@ namespace Penumbra
         /// <summary>How long since the render loop last came round. Seconds; huge = it's stuck.</summary>
         public double SinceLastFrame => Stopwatch.GetElapsedTime(Interlocked.Read(ref _heartbeat)).TotalSeconds;
 
-        /// <summary>Esc during Night sky: keep the taskbar visible (so the tray icon can be reached).</summary>
-        public volatile bool RevealTaskbar;
+        /// <summary>Esc during Night sky: lift the black (the lyrics stay, like Constellation) until Esc
+        /// again, or until the lyrics end. The saved style stays Night sky.</summary>
+        public volatile bool BlackLifted;
         ID2D1Factory1? _d2dFactory;
         ID2D1Device? _d2dDevice;
         ID2D1DeviceContext? _d2d;
@@ -206,18 +207,42 @@ namespace Penumbra
             }
         }
 
-        /// <summary>Night sky: the screen fades to black while its lyrics show (the whole screen, or all
-        /// but the taskbar after Esc), and back when they're gone.</summary>
+        /// <summary>Night sky: the screen fades to black while its lyrics show, and back when they're gone
+        /// (or after Esc).</summary>
         void FollowNightSky(LyricsStyle style, double dt)
         {
-            double target = !_black && style == LyricsStyle.NightSky ? _lyrics?.Visibility ?? 0 : 0;
+            double lyrics = !_black && style == LyricsStyle.NightSky ? _lyrics?.Visibility ?? 0 : 0;
+            if (lyrics < 0.003) BlackLifted = false;   // the lyrics are gone: the next ones start black again
+            double target = BlackLifted ? 0 : lyrics;
             double b = _backdrop + (target - _backdrop) * (1 - Math.Exp(-2.5 * dt));
             if (Math.Abs(b - target) < 0.003) b = target;
-            var rect = RevealTaskbar ? _work : new Native.Rect { Right = Width, Bottom = Height };
+            var rect = target > 0 || _backdrop > 0 ? DarkArea() : new Native.Rect { Right = Width, Bottom = Height };
             if (b != _backdrop || !rect.Equals(_darkRect)) _clearFrames = 2;   // repaint all of both buffers
             _backdrop = b;
             _darkRect = rect;
-            if (b == 0) RevealTaskbar = false;   // next time, black the taskbar out again
+        }
+
+        /// <summary>Which part Night sky blacks out: the whole screen, minus an auto-hidden taskbar while it's
+        /// slid out (pointing at the screen edge, or the Windows key). Read every frame, so the gap follows
+        /// the taskbar as it slides in and out. A taskbar that's always shown stays under the black.</summary>
+        Native.Rect DarkArea()
+        {
+            var all = new Native.Rect { Right = Width, Bottom = Height };
+            // auto-hide: Windows keeps no space for the taskbar, so the work area is the whole screen
+            if (!_work.Equals(all) || Native.TaskbarRect() is not { } s) return all;
+            var tb = new Native.Rect { Left = s.Left - _bounds.Left, Top = s.Top - _bounds.Top,
+                                       Right = s.Right - _bounds.Left, Bottom = s.Bottom - _bounds.Top };
+            if (tb.Right <= 0 || tb.Left >= Width || tb.Bottom <= 0 || tb.Top >= Height) return all;
+
+            bool across = tb.Right - tb.Left >= tb.Bottom - tb.Top;                  // along the top or bottom edge
+            int gap = across ? Math.Min(tb.Bottom, Height) - Math.Max(tb.Top, 0)     // how much is on screen now
+                             : Math.Min(tb.Right, Width) - Math.Max(tb.Left, 0);      // (~2 px when tucked away)
+            if (gap <= 4) return all;
+
+            bool far = across ? tb.Top + tb.Bottom > Height : tb.Left + tb.Right > Width;   // bottom / right edge
+            if (across) { if (far) all.Bottom = Height - gap; else all.Top = gap; }
+            else        { if (far) all.Right = Width - gap; else all.Left = gap; }
+            return all;
         }
 
         // ------------------------------------------------------------------ Direct3D

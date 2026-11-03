@@ -242,7 +242,7 @@
                 <WrapPanel x:Name="LyricsChoices" Margin="0,2,0,2">
                     <RadioButton Style="{StaticResource Seg}" GroupName="lyrics" Tag="Flow" Content="Flow" ToolTip="The line above the taskbar, words lighting up as they're sung"/>
                     <RadioButton Style="{StaticResource Seg}" GroupName="lyrics" Tag="Constellation" Content="Constellation" ToolTip="Words appear as stars joined by lines, the current word big"/>
-                    <RadioButton Style="{StaticResource Seg}" GroupName="lyrics" Tag="NightSky" Content="Night sky" ToolTip="The constellation on a pitch-black screen, glow still around the edges. Press Esc to show the taskbar."/>
+                    <RadioButton Style="{StaticResource Seg}" GroupName="lyrics" Tag="NightSky" Content="Night sky" ToolTip="The constellation on a pitch-black screen, glow still around the edges. Press Esc to lift the black."/>
                 </WrapPanel>
                 <Grid Margin="0,0,0,4" ToolTip="If the lyrics come too late, drag right; too early, drag left">
                     <Grid.ColumnDefinitions>

@@ -94,7 +94,8 @@ Then play something: Spotify, YouTube in a browser, or any app that shows up in 
 ### Night sky
 
 Night sky blacks out the **whole display**, taskbar included, while a song with lyrics plays. It fades back to your desktop when the music stops.
-- **Press Esc** to bring the taskbar back (Esc again hides it), so you can reach the tray icon.
+- **Press Esc** to lift the black: the lyrics carry on as Constellation. Esc again brings the black back, and the next song starts black again.
+- **Auto-hidden taskbar?** Point at the screen edge as usual and it slides out over the black.
 - Your apps keep running under the black, and clicks still reach them.
 - **Safety net:** if Penumbra ever stops responding while the screen is black, the black turns see-through after 3 seconds, and Penumbra closes itself after 10 seconds.
 

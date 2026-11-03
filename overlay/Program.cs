@@ -59,11 +59,11 @@ namespace Penumbra
             };
             check.Start();
 
-            // Night sky blacks out the whole screen; Esc brings the taskbar back (Esc again hides it).
-            // The key watch is only switched on while the screen is black.
-            var esc = new Native.EscWatch(() => window.RevealTaskbar = !window.RevealTaskbar);
+            // Night sky blacks out the whole screen; Esc lifts the black (Esc again brings it back).
+            // The key watch is only switched on while the screen is black, or lifted by Esc.
+            var esc = new Native.EscWatch(() => window.BlackLifted = !window.BlackLifted);
             var dark = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(300) };
-            dark.Tick += (_, _) => esc.Enabled = window.DarkActive;
+            dark.Tick += (_, _) => esc.Enabled = window.DarkActive || window.BlackLifted;
             dark.Start();
 
             // Night sky safety net: the black screen must never outlive a stuck glow window. A thread of

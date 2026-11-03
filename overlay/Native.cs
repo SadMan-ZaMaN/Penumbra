@@ -52,8 +52,8 @@ namespace Penumbra
         [DllImport("user32.dll")] static extern IntPtr CallNextHookEx(IntPtr hook, int code, IntPtr wParam, IntPtr lParam);
 
         /// <summary>Notices the Esc key in any app, without taking it away from that app, while Enabled.
-        /// Night sky's black screen has no focus of its own, so this is how Esc can bring the taskbar back.
-        /// Only on while the screen is black. Create and use it on the UI thread.</summary>
+        /// Night sky's black screen has no focus of its own, so this is how Esc can lift the black.
+        /// Only on while Night sky is showing. Create and use it on the UI thread.</summary>
         public sealed class EscWatch : IDisposable
         {
             readonly HookProc _proc;   // field keeps the callback alive
@@ -147,6 +147,7 @@ namespace Penumbra
         [DllImport("user32.dll")] public static extern bool DestroyWindow(IntPtr hWnd);
         [DllImport("user32.dll")] static extern bool ShowWindow(IntPtr hWnd, int cmd);
         [DllImport("user32.dll")] static extern bool SetLayeredWindowAttributes(IntPtr hWnd, uint key, byte alpha, uint flags);
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern bool SetPropW(IntPtr hWnd, string name, IntPtr data);
         [DllImport("user32.dll")] static extern bool PeekMessageW(out MSG msg, IntPtr hWnd, uint min, uint max, uint remove);
         [DllImport("user32.dll")] static extern bool TranslateMessage(ref MSG msg);
         [DllImport("user32.dll")] static extern IntPtr DispatchMessageW(ref MSG msg);
@@ -200,6 +201,20 @@ namespace Penumbra
             return info.rcWork;
         }
 
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern IntPtr FindWindowW(string cls, string? title);
+        [DllImport("user32.dll")] static extern bool IsWindow(IntPtr hWnd);
+        [DllImport("user32.dll")] static extern bool GetWindowRect(IntPtr hWnd, out Rect r);
+        static IntPtr _taskbar;
+
+        /// <summary>Where the main taskbar's window is right now, in screen pixels (null if there's none).
+        /// An auto-hidden taskbar keeps its size and slides off the screen edge, so this follows it as it
+        /// slides. It only reads the position, so it never waits on Explorer (safe on the render thread).</summary>
+        public static Rect? TaskbarRect()
+        {
+            if (!IsWindow(_taskbar)) _taskbar = FindWindowW("Shell_TrayWnd", null);   // again if Explorer restarted
+            return _taskbar != IntPtr.Zero && GetWindowRect(_taskbar, out var r) ? r : null;
+        }
+
         /// <summary>A borderless, click-through, topmost window with no pixels of its own:
         /// DirectComposition puts the GPU-drawn glow (with per-pixel alpha) on screen.</summary>
         public static IntPtr CreateGlowWindow(WndProc proc, Rect r)
@@ -220,6 +235,10 @@ namespace Penumbra
                 r.Left, r.Top, r.Right - r.Left, r.Bottom - r.Top, IntPtr.Zero, IntPtr.Zero, inst, IntPtr.Zero);
             if (hwnd == IntPtr.Zero) throw new InvalidOperationException("CreateWindowEx failed: " + Marshal.GetLastWin32Error());
             SetLayeredWindowAttributes(hwnd, 0, 255, 2 /* LWA_ALPHA */);
+            // A topmost window covering the whole screen looks like a full-screen app to Windows, which
+            // then won't slide out an auto-hidden taskbar and holds back notifications. This property
+            // tells the shell it isn't one.
+            SetPropW(hwnd, "NonRudeHWND", new IntPtr(1));
             return hwnd;
         }
 
