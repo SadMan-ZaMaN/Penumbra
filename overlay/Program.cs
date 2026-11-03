@@ -39,7 +39,7 @@ namespace Penumbra
                 engine = EngineLauncher.Start(out engineError);
 
             var glow = new GlowController(settings, link);
-            var window = new GlowWindow(settings, glow, black: args.Contains("--black"));
+            var window = new GlowWindow(settings, glow, black: args.Contains("--black"), testFreeze: args.Contains("--test-freeze"));
             Tray? tray = null;
             tray = new Tray(settings, glow, link, () => { ControlPanel.Quitting = true; app.Shutdown(); });
             if (engineError != null)
@@ -65,6 +65,30 @@ namespace Penumbra
             var dark = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(300) };
             dark.Tick += (_, _) => esc.Enabled = window.DarkActive;
             dark.Start();
+
+            // Night sky safety net: the black screen must never outlive a stuck glow window. A thread of
+            // its own (so it works even if everything else is stuck) watches the render loop's heartbeat.
+            new Thread(() =>
+            {
+                bool hidden = false;
+                while (true)
+                {
+                    Thread.Sleep(500);
+                    double stuck = window.SinceLastFrame;
+                    if (!hidden && window.DarkActive && stuck > 3)
+                    {
+                        Native.SetGlowOpacity(window.Handle, 0);   // first: make the black see-through
+                        hidden = true;
+                    }
+                    else if (hidden && stuck < 1)
+                    {
+                        Native.SetGlowOpacity(window.Handle, 255); // it came back by itself
+                        hidden = false;
+                    }
+                    else if (hidden && stuck > 10)
+                        Process.GetCurrentProcess().Kill();   // last resort: closing always clears it (the engine quits too)
+                }
+            }) { IsBackground = true, Name = "NightSkySafety" }.Start();
 
             app.Exit += (_, _) =>
             {

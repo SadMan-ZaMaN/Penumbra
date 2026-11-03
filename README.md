@@ -51,11 +51,14 @@ The top of the panel shows what's playing and the colors the glow is using right
 | Smoothness | How often the glow redraws. **Smooth**: every screen refresh. **Balanced** (default): every 2nd refresh on fast screens (45 fps at 90 Hz). **Saver**: about 30 fps |
 | Motion | **Music sync** reacts to the beat and only shows while there's sound. **Steady** is a calm, slow light that stays on |
 | Glow when nothing is playing | Keep a dim glow during silence instead of fading out |
-| Show lyrics | Synced lyrics (from lrclib.net). **Flow**: one big bold line above the taskbar, a soft sweep filling it in white as it's sung, the next line dim below, old lines blurring away (like Apple Music). **Constellation**: each word appears as a star joined to the last, the word being sung big and bright, spread over the middle 70% of the screen. **Night sky**: the constellation on a pitch-black screen (taskbar too), the glow still around the edges; it fades back to your desktop when the music stops. Press **Esc** to bring the taskbar back (Esc again hides it) |
+| Show lyrics | Synced lyrics (from lrclib.net). **Flow**: one big bold line above the taskbar, a soft sweep filling it in white as it's sung, the next line dim below, old lines blurring away (like Apple Music). **Constellation**: each word appears as a star joined to the last, the word being sung big and bright, spread over the middle 70% of the screen. **Night sky**: the constellation on a pitch-black screen (taskbar too), the glow still around the edges; it fades back to your desktop when the music stops. Press **Esc** to bring the taskbar back (Esc again hides it). Safety net: if Penumbra ever stops responding while the screen is black, the black is made see-through after 3 s, and Penumbra closes itself after 10 s |
 | Lyrics timing | Slide right if the lyrics come too late, left if too early. Starts at 0.3 s early, so a line is readable as it begins. Each song's singing pace is measured from its lyrics, so the words light up at the right speed |
 | Show in screenshots & recordings | Off by default, so the screen sampling never sees the glow itself. Turn it on to record a demo of the glow |
+| OLED care | On by default. Slowly moves the glow and lyrics up to 4 px inward and back over 15 minutes (far too slow to see), so the same row of pixels doesn't take all the wear. Worth keeping on for OLED screens |
 | Start with Windows | Adds or removes a registry Run entry |
 | ↻ (bottom right) | Resets the look: Auto colors, and default thickness, glow, brightness, waviness, corners and motion. The switches above stay as they are |
+
+Lyrics are only looked up (the song's title and artist sent to lrclib.net) while **Show lyrics** is on. Audio and screen colors never leave the PC.
 
 ### How the colors are picked
 

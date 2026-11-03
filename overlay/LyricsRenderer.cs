@@ -91,6 +91,9 @@ namespace Penumbra
         /// <summary>Pixels this renderer drew into last frame (null = nothing).</summary>
         public RawRect? Drawn { get; private set; }
 
+        /// <summary>OLED care: nudges everything a few px (set by the glow window, drifts very slowly).</summary>
+        public Vector2 Shift { get; set; }
+
         public LyricsRenderer(ID2D1Factory1 factory)
         {
             _factory = factory;
@@ -414,7 +417,7 @@ namespace Penumbra
             var ctx = _ctx!;
             var glow = new Color4(primary.R / 255f, primary.G / 255f, primary.B / 255f, 1);
             var sung = new Color4(Mix(1, glow.R, 0.22f), Mix(1, glow.G, 0.22f), Mix(1, glow.B, 0.22f), 1);
-            var origin = Matrix3x2.CreateTranslation(_region.Left, _region.Top);
+            var origin = Matrix3x2.CreateTranslation(_region.Left + Shift.X, _region.Top + Shift.Y);
             if (_glowWipe == null || Math.Abs(_glowWipeColor.R - glow.R) + Math.Abs(_glowWipeColor.G - glow.G) + Math.Abs(_glowWipeColor.B - glow.B) > 0.02f)
             {
                 _glowWipe?.Dispose();   // gradient colors are fixed once made, so remake it as the glow color drifts

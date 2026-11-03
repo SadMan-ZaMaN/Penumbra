@@ -31,7 +31,7 @@ namespace Penumbra
             public Vector4 Primary, Secondary;
             public float Base, Wave, Pulse, White;
             public Vector4 S0, S1, S2, S3, S4, S5, S6, S7;
-            public float Backdrop; Vector3 _pad;
+            public float Backdrop, Inset; Vector2 _pad;
             public Vector4 Dark;
             public Vector4 Extra;
         }
@@ -62,6 +62,15 @@ namespace Penumbra
         /// <summary>The screen is (going) black for Night sky, so Esc should be able to bring back the taskbar.</summary>
         public bool DarkActive => _backdrop > 0.01;
 
+        /// <summary>The glow window, for the Night sky safety net (Program.cs).</summary>
+        public IntPtr Handle => _hwnd;
+
+        long _heartbeat = Stopwatch.GetTimestamp();   // stamped every pass of the render loop
+        readonly bool _testFreeze;                    // --test-freeze: hang once the screen is black (to test the safety net)
+
+        /// <summary>How long since the render loop last came round. Seconds; huge = it's stuck.</summary>
+        public double SinceLastFrame => Stopwatch.GetElapsedTime(Interlocked.Read(ref _heartbeat)).TotalSeconds;
+
         /// <summary>Esc during Night sky: keep the taskbar visible (so the tray icon can be reached).</summary>
         public volatile bool RevealTaskbar;
         ID2D1Factory1? _d2dFactory;
@@ -83,11 +92,12 @@ namespace Penumbra
         public string? Error { get; private set; }
 
         /// <param name="black">draw on black instead of see-through (for judging the look)</param>
-        public GlowWindow(Settings settings, GlowController ctl, bool black = false)
+        public GlowWindow(Settings settings, GlowController ctl, bool black = false, bool testFreeze = false)
         {
             _settings = settings;
             _ctl = ctl;
             _black = black;
+            _testFreeze = testFreeze;
             _thread = new Thread(Run) { IsBackground = true, Name = "Glow" };
             _thread.Start();
         }
@@ -125,6 +135,8 @@ namespace Penumbra
 
             while (!_stop)
             {
+                Interlocked.Exchange(ref _heartbeat, Stopwatch.GetTimestamp());
+                if (_testFreeze && _backdrop >= 0.99) Thread.Sleep(Timeout.Infinite);
                 Native.PumpMessages();
                 double t = clock.Elapsed.TotalSeconds;
 
@@ -151,6 +163,8 @@ namespace Penumbra
                 double dt = Math.Clamp(t - lastT, 0, 0.1);
                 lastT = t;
                 var style = _settings.LyricsStyle;
+                _inset = OledInset(t);
+                if (_lyrics != null) _lyrics.Shift = new Vector2((float)_inset, (float)_inset);   // the lyrics drift too
                 _lyrics?.Update(_ctl.Last, _settings.ShowLyrics && _ctl.Last?.sound == true, style,
                                 LyricsRenderer.RegionFor(style, _work, _scale), dt, _scale);
                 if (_settings.Enabled != shown) { shown = _settings.Enabled; Native.Show(_hwnd, shown); }
@@ -304,7 +318,12 @@ namespace Penumbra
 
         /// <summary>Width of the edge strips, px. Must cover Reach() + the strips in Glow.hlsl's VS.</summary>
         static int Band(in Constants c) =>
-            (int)Math.Min(Math.Ceiling(Math.Max(c.Rim * 3.5 + c.Halo * 5 + 4, c.Radius)) + 2, Math.Min(c.Size.X, c.Size.Y) / 2);
+            (int)Math.Min(Math.Ceiling(Math.Max(c.Rim * 3.5 + c.Halo * 5 + 4, c.Radius) + c.Inset) + 2, Math.Min(c.Size.X, c.Size.Y) / 2);
+
+        /// <summary>OLED care: how far in the glow sits right now, px. Goes 0 → 4 → 0 over 15 minutes, evenly
+        /// (a triangle wave, so every offset gets the same time), far too slow to see it move.</summary>
+        double OledInset(double t) => _settings.OledCare ? 4 * Math.Abs(t / 900 % 1 * 2 - 1) : 0;
+        double _inset;
 
         void Draw(GlowFrame f)
         {
@@ -329,6 +348,7 @@ namespace Penumbra
                 S0 = S(f.Streams[0]), S1 = S(f.Streams[1]), S2 = S(f.Streams[2]), S3 = S(f.Streams[3]),
                 S4 = S(f.Streams[4]), S5 = S(f.Streams[5]), S6 = S(f.Streams[6]), S7 = S(f.Streams[7]),
                 Backdrop = _black ? 1 : (float)_backdrop,
+                Inset = (float)_inset,
                 Dark = _black ? new Vector4(0, 0, Width, Height)
                               : new Vector4(_darkRect.Left, _darkRect.Top, _darkRect.Right, _darkRect.Bottom),
             };

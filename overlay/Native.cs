@@ -225,6 +225,10 @@ namespace Penumbra
 
         public static void Show(IntPtr hwnd, bool show) => ShowWindow(hwnd, show ? 4 /* SW_SHOWNOACTIVATE */ : 0);
 
+        /// <summary>Make the whole glow window see-through (0) or normal (255). Works from any thread,
+        /// even if the window's own thread is stuck, which is what the Night sky safety net needs.</summary>
+        public static void SetGlowOpacity(IntPtr hwnd, byte alpha) => SetLayeredWindowAttributes(hwnd, 0, alpha, 2 /* LWA_ALPHA */);
+
         public static void PumpMessages()
         {
             while (PeekMessageW(out var msg, IntPtr.Zero, 0, 0, 1 /* PM_REMOVE */))

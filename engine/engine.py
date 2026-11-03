@@ -304,7 +304,9 @@ def main():
                 if thumb:                    # no art yet: keep the last colors rather than flash to default
                     art_colors = dominant_colors(thumb)
             hidden = is_placeholder(np_state["title"], np_state["artist"])   # Incognito: no real title
-            lyrics.set_track(np_state["artist"], "" if hidden else np_state["title"],
+            # lyrics are looked up (sending the title and artist to lrclib.net) only while they're switched on
+            want_lyrics = bool(settings.get("ShowLyrics", False)) or args.demo
+            lyrics.set_track(np_state["artist"], np_state["title"] if want_lyrics and not hidden else "",
                              np_state["album"], np_state["duration"])
             # the panel's "Lyrics timing" (seconds earlier; a little early by default, so a line is
             # readable as it starts) plus --lyrics-offset
@@ -347,7 +349,7 @@ def main():
                 "lyric": cur, "next": nxt, "lprog": round(prog, 3),
                 "lidx": lidx, "lt": round(lt, 3), "ld": round(ld, 3),
                 # for the panel: found / searching / none / private ('' = nothing playing)
-                "lstat": "private" if hidden and np_state["title"] else lyrics.status,
+                "lstat": "" if not want_lyrics else "private" if hidden and np_state["title"] else lyrics.status,
             }
             sock.sendto(json.dumps(pkt, ensure_ascii=False).encode("utf-8"), addr)
 

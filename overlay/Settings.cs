@@ -44,6 +44,7 @@ namespace Penumbra
         public LyricsStyle LyricsStyle { get; set; } = LyricsStyle.Flow;
         public double LyricsOffset { get; set; } = 0.3;  // seconds the lyrics run early (negative = late); the engine reads it
         public bool ShowInCapture { get; set; } = false; // visible in screenshots / recordings
+        public bool OledCare { get; set; } = true;       // slowly shift the glow a few px so the same pixels don't wear most
 
         /// <summary>Back to the default look: automatic colors, default thickness, glow, brightness,
         /// waviness, corners, motion and smoothness. Behaviour switches (lyrics, start with Windows...) stay as they are.</summary>

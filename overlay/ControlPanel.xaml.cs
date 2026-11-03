@@ -73,6 +73,7 @@ namespace Penumbra
                 Set(() => _s.LyricsOffset = v);
             };
             ShowInCapture.Click += (_, _) => Set(() => _s.ShowInCapture = ShowInCapture.IsChecked == true);
+            OledCare.Click += (_, _) => Set(() => _s.OledCare = OledCare.IsChecked == true);
             AutoStart.Click += (_, _) => Tray.SetAutoStart(AutoStart.IsChecked == true);
             PrimarySwatch.Click += (_, _) => Pick(true);
             SecondarySwatch.Click += (_, _) => Pick(false);
@@ -148,6 +149,7 @@ namespace Penumbra
             LyricsTiming.Value = _s.LyricsOffset;
             LyricsTimingText.Text = TimingText(_s.LyricsOffset);
             ShowInCapture.IsChecked = _s.ShowInCapture;
+            OledCare.IsChecked = _s.OledCare;
             AutoStart.IsChecked = Tray.IsAutoStart();
             _loading = false;
         }

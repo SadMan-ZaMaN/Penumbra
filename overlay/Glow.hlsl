@@ -23,6 +23,7 @@ cbuffer Glow : register(b0)
     float  White;       // a touch of white in the middle of the line
     float4 Streams[8];  // x = centre along the edge 0..1, y = half length 0..0.5, z = brightness
     float  Backdrop;    // how black the Dark rectangle is behind the glow, 0..1 (Night sky lyrics; --black for tuning)
+    float  Inset;       // OLED care: the glow sits this many px in from the edge (drifts 0..4 over 15 minutes)
     float4 Dark;        // left, top, right, bottom px of the part that goes black
     float4 Extra;       // one more rectangle to draw (where last frames' lyrics were, to wipe them); empty = none
 };
@@ -30,7 +31,7 @@ cbuffer Glow : register(b0)
 static const float TAU = 6.28318530718;
 
 // how far from the edge any light can reach, px (GlowWindow.Reach does the same sum for its dirty rects)
-float Reach() { return max(Rim * 3.5 + Halo * 5 + 4, Radius); }
+float Reach() { return max(Rim * 3.5 + Halo * 5 + 4, Radius) + Inset; }
 
 // Four strips along the edges (4 quads = 24 vertices, no vertex buffer needed). The middle of the
 // screen is never drawn, which saves the GPU from shading millions of empty pixels every frame.
@@ -115,8 +116,9 @@ float3 MixColors(float3 a, float3 b, float t)
 float4 PS(float4 pos : SV_Position) : SV_Target
 {
     // distance to each straight edge: top, right, bottom, left
-    float4 de = float4(pos.y, Size.x - pos.x, Size.y - pos.y, pos.x);
-    float reach = Reach();
+    // distances are measured from Inset px inside the screen's edge (OLED care), so the whole glow sits there
+    float4 de = float4(pos.y, Size.x - pos.x, Size.y - pos.y, pos.x) - Inset;
+    float reach = Reach() - Inset;
     bool dark = pos.x >= Dark.x && pos.x < Dark.z && pos.y >= Dark.y && pos.y < Dark.w;
     float black = dark ? Backdrop : 0;
     if (min(min(de.x, de.y), min(de.z, de.w)) > reach) return float4(0, 0, 0, black);   // the middle: nothing to draw
@@ -131,6 +133,7 @@ float4 PS(float4 pos : SV_Position) : SV_Target
     // so the screen itself looks rounded and the light hugs a real-looking edge
     float corner = Radius >= 1 ? saturate(0.5 - d) : 0;
     float under = max(corner, black);
+    d -= Inset;   // the black corners stay at the real edge; the light sits Inset px in
 
     // how lit this part of the edge is: the streams passing by (flat in the middle, tapered ends)
     float lit = Base;
@@ -160,6 +163,7 @@ float4 PS(float4 pos : SV_Position) : SV_Target
     }
     else glow = d >= 0 ? exp(-max(d - width, 0) / max(halo, 1)) : 0;
     float I = saturate(stroke + 0.55 * glow * (1 - stroke)) * lit * Opacity;
+    I *= saturate(d + 1.5);   // nothing between the screen's edge and the inset line (soft 1.5 px)
 
     // two-color gradient that slowly travels around the screen (primary covers a bit more)
     float g = 0.5 + 0.5 * cos(TAU * (u - Phase)) + 0.15 * sin(TAU * (2 * u + Phase * 1.7) + 1.3);
