@@ -33,6 +33,7 @@ namespace Penumbra
             public Vector4 S0, S1, S2, S3, S4, S5, S6, S7;
             public float Backdrop; Vector3 _pad;
             public Vector4 Dark;
+            public Vector4 Extra;
         }
 
         readonly Settings _settings;
@@ -50,8 +51,10 @@ namespace Penumbra
         int _clearFrames;    // frames that must wipe the whole buffer first (one per swap chain buffer)
         bool _fullPresent;   // this frame changed more than the edge strips
         readonly RawRect[] _dirty = new RawRect[4], _dirtyWithLyrics = new RawRect[5];
-        RawRect? _lyricsArea;  // px that may hold lyrics in either buffer (cleared each frame)
-        int _lyricsClear;      // frames left to wipe _lyricsArea after the lyrics are gone
+        // Where the lyrics were drawn 1 and 2 frames ago. There are two buffers taking turns, so the one
+        // about to be drawn still holds the lyrics from 2 frames ago; both get wiped before drawing.
+        RawRect? _lyrics1, _lyrics2;
+        RawRect? _lyricsDirty;  // what changed this frame because of the lyrics (for the compositor)
         Native.Rect _work;     // the main screen minus the taskbar, relative to the window
         double _backdrop;      // Night sky: how black the screen is right now, 0..1
         Native.Rect _darkRect; // which part goes black: the whole screen, or all but the taskbar
@@ -163,7 +166,7 @@ namespace Penumbra
 
                 // nothing lit (faded out, or a gap between streams): draw once (just the black corners,
                 // if rounded), then idle cheaply until there's light again
-                bool busy = _lyrics?.Active == true || _lyricsClear > 0 || _clearFrames > 0;
+                bool busy = _lyrics?.Active == true || _lyrics1 != null || _lyrics2 != null || _clearFrames > 0;
                 bool lit = busy || f.Base >= 0.003;
                 for (int i = 0; i < f.Streams.Length && !lit; i++) lit = f.Streams[i].Brightness >= 0.003;
                 if ((f.Opacity < 0.002 && !busy) || !lit)
@@ -250,11 +253,14 @@ namespace Penumbra
             // Direct2D on the same GPU device, for the lyrics
             _d2dFactory ??= D2D1.D2D1CreateFactory<ID2D1Factory1>(Vortice.Direct2D1.FactoryType.SingleThreaded);
             _d2dDevice = _d2dFactory.CreateDevice(dxgiDevice);
+            // the lyrics draw each word once into a stencil, so Direct2D's caches (glyphs, effect
+            // scratch space) are only needed for a moment when a line arrives: keep them small
+            _d2dDevice.MaximumTextureMemory = 24UL << 20;
             _d2d = _d2dDevice.CreateDeviceContext(DeviceContextOptions.None);
             _d2d.SetDpi(96, 96);   // work in pixels
             CreateD2DTarget();
             _lyrics ??= new LyricsRenderer(_d2dFactory);
-            _lyrics.Attach(_d2d);
+            _lyrics.Attach(_d2d, _d2dDevice);
         }
 
         void CreateD2DTarget()
@@ -293,7 +299,7 @@ namespace Penumbra
             CreateTarget();
             CreateD2DTarget();
             _clearFrames = 2;
-            _lyricsArea = null;
+            _lyrics1 = _lyrics2 = null;
         }
 
         /// <summary>Width of the edge strips, px. Must cover Reach() + the strips in Glow.hlsl's VS.</summary>
@@ -326,6 +332,9 @@ namespace Penumbra
                 Dark = _black ? new Vector4(0, 0, Width, Height)
                               : new Vector4(_darkRect.Left, _darkRect.Top, _darkRect.Right, _darkRect.Bottom),
             };
+            // the glow pass also repaints where the lyrics were, which wipes them (back to the glow,
+            // see-through or Night sky's black, whatever belongs there)
+            if (Union(_lyrics1, _lyrics2) is RawRect wipe) c.Extra = new Vector4(wipe.Left, wipe.Top, wipe.Right, wipe.Bottom);
             var ctx = _ctx!;
 
             // Only the edge strips get drawn; the middle of each buffer stays as it was cleared.
@@ -340,8 +349,6 @@ namespace Penumbra
                 if (_clearFrames > 0) _clearFrames--;
                 _fullPresent = true;
             }
-            else if (_lyricsArea is RawRect area)   // wipe last frame's lyrics (back to black in Night sky)
-                FillD2D(area, (float)_backdrop);
 
             ctx.ClearState();   // Direct2D shares the GPU; start the glow pass from a clean slate
             ctx.UpdateSubresource(in c, _cb!);
@@ -352,20 +359,22 @@ namespace Penumbra
             ctx.VSSetConstantBuffer(0, _cb!);
             ctx.PSSetShader(_ps!);
             ctx.PSSetConstantBuffer(0, _cb!);
-            ctx.Draw(24, 0);   // 4 strips x 2 triangles
+            ctx.Draw(30, 0);   // 4 strips + the lyrics wipe, 2 triangles each
 
             // lyrics on top of the glow
+            RawRect? drawn = null;
             if (_lyrics != null && _lyrics.Active)
             {
                 _lyrics.Draw(_d2dTarget!, f.Primary, _scale);
-                if (_lyrics.Drawn is RawRect drawn)
-                {
-                    _lyricsArea = _lyricsArea is RawRect old ? Union(old, drawn) : drawn;
-                    _lyricsClear = 2;   // after they're gone, wipe the area in both buffers
-                }
+                drawn = _lyrics.Drawn;
             }
-            else if (_lyricsClear > 0 && --_lyricsClear == 0) _lyricsArea = null;
+            _lyricsDirty = Union(_lyrics1, drawn);   // vs. the frame on screen: its lyrics went, these came
+            _lyrics2 = _lyrics1;
+            _lyrics1 = drawn;
         }
+
+        static RawRect? Union(RawRect? a, RawRect? b) =>
+            a is RawRect x ? (b is RawRect y ? Union(x, y) : x) : b;
 
         /// <summary>Set a rectangle of the back buffer to black at <paramref name="alpha"/> (0 = see-through).</summary>
         void FillD2D(RawRect r, float alpha)
@@ -397,7 +406,7 @@ namespace Penumbra
                 _dirty[2] = new RawRect(0, b, b, h - b);
                 _dirty[3] = new RawRect(w - b, b, w, h - b);
                 var rects = _dirty;
-                if (_lyricsArea is RawRect area)   // ...plus the lyrics
+                if (_lyricsDirty is RawRect area)   // ...plus where the lyrics changed
                 {
                     Array.Copy(_dirty, _dirtyWithLyrics, 4);
                     _dirtyWithLyrics[4] = new RawRect(Math.Max(0, area.Left), Math.Max(0, area.Top), Math.Min(w, area.Right), Math.Min(h, area.Bottom));
@@ -418,7 +427,7 @@ namespace Penumbra
             if (_d2d != null) _d2d.Target = null;
             _d2dTarget?.Dispose(); _d2d?.Dispose(); _d2dDevice?.Dispose();
             _d2dTarget = null; _d2d = null; _d2dDevice = null;
-            _lyricsArea = null; _lyricsClear = 0;
+            _lyrics1 = _lyrics2 = _lyricsDirty = null;
             _cb?.Dispose(); _ps?.Dispose(); _vs?.Dispose(); _rtv?.Dispose();
             _visual?.Dispose(); _target?.Dispose(); _dcomp?.Dispose();
             _swap?.Dispose(); _ctx?.Dispose(); _device?.Dispose();

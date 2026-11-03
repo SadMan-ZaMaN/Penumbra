@@ -24,6 +24,7 @@ cbuffer Glow : register(b0)
     float4 Streams[8];  // x = centre along the edge 0..1, y = half length 0..0.5, z = brightness
     float  Backdrop;    // how black the Dark rectangle is behind the glow, 0..1 (Night sky lyrics; --black for tuning)
     float4 Dark;        // left, top, right, bottom px of the part that goes black
+    float4 Extra;       // one more rectangle to draw (where last frames' lyrics were, to wipe them); empty = none
 };
 
 static const float TAU = 6.28318530718;
@@ -33,6 +34,7 @@ float Reach() { return max(Rim * 3.5 + Halo * 5 + 4, Radius); }
 
 // Four strips along the edges (4 quads = 24 vertices, no vertex buffer needed). The middle of the
 // screen is never drawn, which saves the GPU from shading millions of empty pixels every frame.
+// A fifth quad (Extra) repaints where the lyrics were, which wipes them before they're drawn again.
 float4 VS(uint id : SV_VertexID) : SV_Position
 {
     float band = min(ceil(Reach()) + 2, min(Size.x, Size.y) * 0.5);
@@ -42,7 +44,8 @@ float4 VS(uint id : SV_VertexID) : SV_Position
     if (quad == 0)      r = float4(0, 0, Size.x, band);                            // top
     else if (quad == 1) r = float4(0, Size.y - band, Size.x, Size.y);              // bottom
     else if (quad == 2) r = float4(0, band, band, Size.y - band);                  // left
-    else                r = float4(Size.x - band, band, Size.x, Size.y - band);    // right
+    else if (quad == 3) r = float4(Size.x - band, band, Size.x, Size.y - band);    // right
+    else                r = Extra;                                                  // (zero size: nothing)
     float2 p = lerp(r.xy, r.zw, c);
     return float4(p.x / Size.x * 2 - 1, 1 - p.y / Size.y * 2, 0, 1);
 }
