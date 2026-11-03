@@ -22,7 +22,8 @@ cbuffer Glow : register(b0)
     float  Pulse;       // beat flash 0..1
     float  White;       // a touch of white in the middle of the line
     float4 Streams[8];  // x = centre along the edge 0..1, y = half length 0..0.5, z = brightness
-    float  Backdrop;    // 1 = draw on black instead of see-through (Penumbra.exe --black, for tuning)
+    float  Backdrop;    // how black the Dark rectangle is behind the glow, 0..1 (Night sky lyrics; --black for tuning)
+    float4 Dark;        // left, top, right, bottom px of the part that goes black
 };
 
 static const float TAU = 6.28318530718;
@@ -113,7 +114,9 @@ float4 PS(float4 pos : SV_Position) : SV_Target
     // distance to each straight edge: top, right, bottom, left
     float4 de = float4(pos.y, Size.x - pos.x, Size.y - pos.y, pos.x);
     float reach = Reach();
-    if (min(min(de.x, de.y), min(de.z, de.w)) > reach) return float4(0, 0, 0, Backdrop);   // the middle: nothing to draw
+    bool dark = pos.x >= Dark.x && pos.x < Dark.z && pos.y >= Dark.y && pos.y < Dark.w;
+    float black = dark ? Backdrop : 0;
+    if (min(min(de.x, de.y), min(de.z, de.w)) > reach) return float4(0, 0, 0, black);   // the middle: nothing to draw
 
     // d follows the real corners for the line. u, the position along the edge, comes from a much
     // rounder shape so colors and streams flow smoothly past the corners.
@@ -124,7 +127,7 @@ float4 PS(float4 pos : SV_Position) : SV_Target
     // with rounded corners, the bit of screen outside the curve is painted black (smooth edge),
     // so the screen itself looks rounded and the light hugs a real-looking edge
     float corner = Radius >= 1 ? saturate(0.5 - d) : 0;
-    float under = max(corner, Backdrop);
+    float under = max(corner, black);
 
     // how lit this part of the edge is: the streams passing by (flat in the middle, tapered ends)
     float lit = Base;

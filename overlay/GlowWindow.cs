@@ -32,6 +32,7 @@ namespace Penumbra
             public float Base, Wave, Pulse, White;
             public Vector4 S0, S1, S2, S3, S4, S5, S6, S7;
             public float Backdrop; Vector3 _pad;
+            public Vector4 Dark;
         }
 
         readonly Settings _settings;
@@ -51,6 +52,15 @@ namespace Penumbra
         readonly RawRect[] _dirty = new RawRect[4], _dirtyWithLyrics = new RawRect[5];
         RawRect? _lyricsArea;  // px that may hold lyrics in either buffer (cleared each frame)
         int _lyricsClear;      // frames left to wipe _lyricsArea after the lyrics are gone
+        Native.Rect _work;     // the main screen minus the taskbar, relative to the window
+        double _backdrop;      // Night sky: how black the screen is right now, 0..1
+        Native.Rect _darkRect; // which part goes black: the whole screen, or all but the taskbar
+
+        /// <summary>The screen is (going) black for Night sky, so Esc should be able to bring back the taskbar.</summary>
+        public bool DarkActive => _backdrop > 0.01;
+
+        /// <summary>Esc during Night sky: keep the taskbar visible (so the tray icon can be reached).</summary>
+        public volatile bool RevealTaskbar;
         ID2D1Factory1? _d2dFactory;
         ID2D1Device? _d2dDevice;
         ID2D1DeviceContext? _d2d;
@@ -109,7 +119,6 @@ namespace Penumbra
             bool shown = false, cleared = false;
             double lastCheck = -1, lastTop = 0, lastFrame = 0, idleRadius = -1, lastT = 0;
             bool? excluded = null;
-            Native.Rect work = default;      // the main screen minus the taskbar, relative to the window
 
             while (!_stop)
             {
@@ -132,7 +141,7 @@ namespace Penumbra
                     bool ex = !_settings.ShowInCapture;
                     if (excluded != ex) { excluded = ex; Native.ExcludeFromCapture(_hwnd, ex); }
                     var wa = Native.PrimaryWorkArea();
-                    work = new Native.Rect { Left = wa.Left - b.Left, Top = wa.Top - b.Top, Right = wa.Right - b.Left, Bottom = wa.Bottom - b.Top };
+                    _work = new Native.Rect { Left = wa.Left - b.Left, Top = wa.Top - b.Top, Right = wa.Right - b.Left, Bottom = wa.Bottom - b.Top };
                 }
 
                 var f = _ctl.Update(t);
@@ -140,16 +149,24 @@ namespace Penumbra
                 lastT = t;
                 var style = _settings.LyricsStyle;
                 _lyrics?.Update(_ctl.Last, _settings.ShowLyrics && _ctl.Last?.sound == true, style,
-                                LyricsRenderer.RegionFor(style, work, _scale), dt, _scale);
+                                LyricsRenderer.RegionFor(style, _work, _scale), dt, _scale);
                 if (_settings.Enabled != shown) { shown = _settings.Enabled; Native.Show(_hwnd, shown); }
                 if (!shown) { Thread.Sleep(100); continue; }
-                if (t - lastTop > 2) { lastTop = t; Native.BringToTop(_hwnd); }   // stay above the taskbar & co.
+                FollowNightSky(style, dt);
+                if (t - lastTop > 2)            // stay above the taskbar & co. (but under the panel)
+                {
+                    lastTop = t;
+                    Native.BringToTop(_hwnd);
+                    var panel = ControlPanel.ShownHandle;
+                    if (panel != IntPtr.Zero) Native.BringToTopAsync(panel);
+                }
 
                 // nothing lit (faded out, or a gap between streams): draw once (just the black corners,
                 // if rounded), then idle cheaply until there's light again
-                bool lit = f.Base >= 0.003 || _lyrics?.Active == true || _lyricsClear > 0;
+                bool busy = _lyrics?.Active == true || _lyricsClear > 0 || _clearFrames > 0;
+                bool lit = busy || f.Base >= 0.003;
                 for (int i = 0; i < f.Streams.Length && !lit; i++) lit = f.Streams[i].Brightness >= 0.003;
-                if ((f.Opacity < 0.002 && _lyrics?.Active != true && _lyricsClear == 0) || !lit)
+                if ((f.Opacity < 0.002 && !busy) || !lit)
                 {
                     if (!cleared || f.Radius != idleRadius)
                     {
@@ -170,6 +187,20 @@ namespace Penumbra
                 if (spent < 0.005) Thread.Sleep(1);
                 lastFrame = clock.Elapsed.TotalSeconds;
             }
+        }
+
+        /// <summary>Night sky: the screen fades to black while its lyrics show (the whole screen, or all
+        /// but the taskbar after Esc), and back when they're gone.</summary>
+        void FollowNightSky(LyricsStyle style, double dt)
+        {
+            double target = !_black && style == LyricsStyle.NightSky ? _lyrics?.Visibility ?? 0 : 0;
+            double b = _backdrop + (target - _backdrop) * (1 - Math.Exp(-2.5 * dt));
+            if (Math.Abs(b - target) < 0.003) b = target;
+            var rect = RevealTaskbar ? _work : new Native.Rect { Right = Width, Bottom = Height };
+            if (b != _backdrop || !rect.Equals(_darkRect)) _clearFrames = 2;   // repaint all of both buffers
+            _backdrop = b;
+            _darkRect = rect;
+            if (b == 0) RevealTaskbar = false;   // next time, black the taskbar out again
         }
 
         // ------------------------------------------------------------------ Direct3D
@@ -291,7 +322,9 @@ namespace Penumbra
                 White = (float)f.White,
                 S0 = S(f.Streams[0]), S1 = S(f.Streams[1]), S2 = S(f.Streams[2]), S3 = S(f.Streams[3]),
                 S4 = S(f.Streams[4]), S5 = S(f.Streams[5]), S6 = S(f.Streams[6]), S7 = S(f.Streams[7]),
-                Backdrop = _black ? 1 : 0,
+                Backdrop = _black ? 1 : (float)_backdrop,
+                Dark = _black ? new Vector4(0, 0, Width, Height)
+                              : new Vector4(_darkRect.Left, _darkRect.Top, _darkRect.Right, _darkRect.Bottom),
             };
             var ctx = _ctx!;
 
@@ -302,20 +335,13 @@ namespace Penumbra
             if (_black || _clearFrames > 0)
             {
                 ctx.ClearRenderTargetView(_rtv!, new Color4(0, 0, 0, _black ? 1 : 0));
+                if (!_black && _backdrop > 0)   // Night sky: the black part of the screen
+                    FillD2D(new RawRect(_darkRect.Left, _darkRect.Top, _darkRect.Right, _darkRect.Bottom), (float)_backdrop);
                 if (_clearFrames > 0) _clearFrames--;
                 _fullPresent = true;
             }
-            else if (_lyricsArea is RawRect area)   // wipe last frame's lyrics before drawing anything
-            {
-                var d2d = _d2d!;
-                d2d.Target = _d2dTarget;
-                d2d.BeginDraw();
-                d2d.Transform = Matrix3x2.Identity;
-                d2d.PushAxisAlignedClip(new RawRectF(area.Left, area.Top, area.Right, area.Bottom), AntialiasMode.Aliased);
-                d2d.Clear(new Color4(0, 0, 0, 0));
-                d2d.PopAxisAlignedClip();
-                d2d.EndDraw();
-            }
+            else if (_lyricsArea is RawRect area)   // wipe last frame's lyrics (back to black in Night sky)
+                FillD2D(area, (float)_backdrop);
 
             ctx.ClearState();   // Direct2D shares the GPU; start the glow pass from a clean slate
             ctx.UpdateSubresource(in c, _cb!);
@@ -339,6 +365,19 @@ namespace Penumbra
                 }
             }
             else if (_lyricsClear > 0 && --_lyricsClear == 0) _lyricsArea = null;
+        }
+
+        /// <summary>Set a rectangle of the back buffer to black at <paramref name="alpha"/> (0 = see-through).</summary>
+        void FillD2D(RawRect r, float alpha)
+        {
+            var d2d = _d2d!;
+            d2d.Target = _d2dTarget;
+            d2d.BeginDraw();
+            d2d.Transform = Matrix3x2.Identity;
+            d2d.PushAxisAlignedClip(new RawRectF(r.Left, r.Top, r.Right, r.Bottom), AntialiasMode.Aliased);
+            d2d.Clear(new Color4(0, 0, 0, alpha));
+            d2d.PopAxisAlignedClip();
+            d2d.EndDraw();
         }
 
         static RawRect Union(RawRect a, RawRect b) =>

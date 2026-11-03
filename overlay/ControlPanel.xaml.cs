@@ -17,6 +17,10 @@ namespace Penumbra
         /// <summary>Set before quitting so closing the window really closes it (normally it just hides).</summary>
         public static bool Quitting;
 
+        /// <summary>The panel's window while it's showing, so the glow window can stay underneath it
+        /// (matters for Night sky, where the glow window blacks out the screen).</summary>
+        public static volatile IntPtr ShownHandle;
+
         static readonly (string name, string primary, string secondary)[] PresetColors =
         {
             ("Neon", "#7c5cff", "#ff4fa3"), ("Ocean", "#00c6ff", "#3a5bff"), ("Sunset", "#ff5e3a", "#ffb347"),
@@ -62,6 +66,12 @@ namespace Penumbra
             ShowLyrics.Click += (_, _) => Set(() => _s.ShowLyrics = ShowLyrics.IsChecked == true);
             foreach (RadioButton r in LyricsChoices.Children)
                 r.Checked += (_, _) => Set(() => _s.LyricsStyle = Enum.Parse<LyricsStyle>((string)r.Tag));
+            LyricsTiming.ValueChanged += (_, e) =>
+            {
+                double v = Math.Round(e.NewValue * 20) / 20;   // steps of 0.05 s
+                LyricsTimingText.Text = TimingText(v);
+                Set(() => _s.LyricsOffset = v);
+            };
             ShowInCapture.Click += (_, _) => Set(() => _s.ShowInCapture = ShowInCapture.IsChecked == true);
             AutoStart.Click += (_, _) => Tray.SetAutoStart(AutoStart.IsChecked == true);
             PrimarySwatch.Click += (_, _) => Pick(true);
@@ -88,7 +98,11 @@ namespace Penumbra
                 _hiddenAt = Environment.TickCount64;
             };
             KeyDown += (_, e) => { if (e.Key == System.Windows.Input.Key.Escape) Hide(); };
-            IsVisibleChanged += (_, _) => { if (IsVisible) { Load(); UpdateLive(); _live.Start(); } else _live.Stop(); };
+            IsVisibleChanged += (_, _) =>
+            {
+                ShownHandle = IsVisible ? new WindowInteropHelper(this).Handle : IntPtr.Zero;
+                if (IsVisible) { Load(); UpdateLive(); _live.Start(); } else _live.Stop();
+            };
             SourceInitialized += (_, _) => Native.UseRoundedCorners(new WindowInteropHelper(this).Handle);
             Icon = Imaging.CreateBitmapSourceFromHIcon(Tray.MakeIcon().Handle, Int32Rect.Empty, BitmapSizeOptions.FromEmptyOptions());
         }
@@ -131,6 +145,8 @@ namespace Penumbra
             HiddenVideoThumbnail.IsChecked = _s.HiddenVideoThumbnail;
             ShowLyrics.IsChecked = _s.ShowLyrics;
             foreach (RadioButton r in LyricsChoices.Children) r.IsChecked = (string)r.Tag == _s.LyricsStyle.ToString();
+            LyricsTiming.Value = _s.LyricsOffset;
+            LyricsTimingText.Text = TimingText(_s.LyricsOffset);
             ShowInCapture.IsChecked = _s.ShowInCapture;
             AutoStart.IsChecked = Tray.IsAutoStart();
             _loading = false;
@@ -193,6 +209,9 @@ namespace Penumbra
             ColorInfo.Text = from;
             LiveColors.Background = new LinearGradientBrush(_glow.Primary, _glow.Secondary, 0);
         }
+
+        static string TimingText(double v) =>
+            Math.Abs(v) < 0.025 ? "on time" : v > 0 ? $"{v:0.##} s early" : $"{-v:0.##} s late";
 
         static Brush Gradient(string a, string b) =>
             new LinearGradientBrush(GlowController.Parse(a, Colors.White), GlowController.Parse(b, Colors.White), 0);

@@ -40,6 +40,54 @@ namespace Penumbra
         public static void BringToTop(IntPtr hwnd) =>
             SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
 
+        /// <summary>The same for a window that belongs to another thread, without waiting for it.</summary>
+        public static void BringToTopAsync(IntPtr hwnd) =>
+            SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | 0x4000 /* SWP_ASYNCWINDOWPOS */);
+
+        // ------------------------------------------------------------------ Esc during Night sky
+
+        delegate IntPtr HookProc(int code, IntPtr wParam, IntPtr lParam);
+        [DllImport("user32.dll")] static extern IntPtr SetWindowsHookExW(int id, HookProc proc, IntPtr mod, uint thread);
+        [DllImport("user32.dll")] static extern bool UnhookWindowsHookEx(IntPtr hook);
+        [DllImport("user32.dll")] static extern IntPtr CallNextHookEx(IntPtr hook, int code, IntPtr wParam, IntPtr lParam);
+
+        /// <summary>Notices the Esc key in any app, without taking it away from that app, while Enabled.
+        /// Night sky's black screen has no focus of its own, so this is how Esc can bring the taskbar back.
+        /// Only on while the screen is black. Create and use it on the UI thread.</summary>
+        public sealed class EscWatch : IDisposable
+        {
+            readonly HookProc _proc;   // field keeps the callback alive
+            readonly Action _onEsc;
+            IntPtr _hook;
+            long _last;
+
+            public EscWatch(Action onEsc) { _onEsc = onEsc; _proc = Hook; }
+
+            public bool Enabled
+            {
+                get => _hook != IntPtr.Zero;
+                set
+                {
+                    if (value == Enabled) return;
+                    if (value) _hook = SetWindowsHookExW(13 /* WH_KEYBOARD_LL */, _proc, GetModuleHandleW(null), 0);
+                    else { UnhookWindowsHookEx(_hook); _hook = IntPtr.Zero; }
+                }
+            }
+
+            IntPtr Hook(int code, IntPtr wParam, IntPtr lParam)
+            {
+                if (code >= 0 && wParam == (IntPtr)0x100 /* WM_KEYDOWN */ && Marshal.ReadInt32(lParam) == 0x1B /* VK_ESCAPE */
+                    && Environment.TickCount64 - _last > 400)   // holding Esc down shouldn't flip it back and forth
+                {
+                    _last = Environment.TickCount64;
+                    System.Windows.Application.Current?.Dispatcher.BeginInvoke(_onEsc);
+                }
+                return CallNextHookEx(_hook, code, wParam, lParam);
+            }
+
+            public void Dispose() => Enabled = false;
+        }
+
         public static void MoveTo(IntPtr hwnd, Rect r) =>
             SetWindowPos(hwnd, HWND_TOPMOST, r.Left, r.Top, r.Right - r.Left, r.Bottom - r.Top, SWP_NOACTIVATE);
 

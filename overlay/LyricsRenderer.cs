@@ -8,7 +8,9 @@ using Vortice.Mathematics;
 
 namespace Penumbra
 {
-    public enum LyricsStyle { Flow, Constellation }
+    /// <summary>Flow = one line above the taskbar; Constellation = words as stars; NightSky = the
+    /// constellation on a pitch-black screen (the glow stays on around the edges).</summary>
+    public enum LyricsStyle { Flow, Constellation, NightSky }
 
     /// <summary>
     /// Synced lyrics, drawn with Direct2D / DirectWrite into the glow window on the render thread.
@@ -124,6 +126,9 @@ namespace Penumbra
 
         /// <summary>Is there anything to draw (or still fading)?</summary>
         public bool Active => _alpha > 0.002 || _leaving.Count > 0;
+
+        /// <summary>How visible the lyrics are right now, 0..1 (fades in and out).</summary>
+        public double Visibility => _alpha;
 
         /// <summary>Follow the engine's lyric state. <paramref name="show"/> = lyrics switched on and sound playing;
         /// <paramref name="region"/> = where the lyrics go (see <see cref="RegionFor"/>).</summary>
@@ -310,11 +315,11 @@ namespace Penumbra
             float rw = _region.Right - _region.Left, rh = _region.Bottom - _region.Top;
             var rng = new Random(line.Text.GetHashCode() ^ line.Index);
             var boxes = new List<RawRectF>();
-            float hop = (float)(80 * scale), pad = (float)(16 * scale);
+            float hop = (float)(104 * scale), pad = (float)(16 * scale);   // roomy: words spread over the area
             RawRectF Box(Vector2 c, Word w, float s) =>   // the star plus its word at size s
                 new(c.X - pad, c.Y - w.H * s * 0.6f - pad, c.X + pad + w.W * s + _formatPx * 0.3f, c.Y + w.H * s * 0.6f + pad);
 
-            Vector2 at = new(rw * (0.1f + 0.25f * (float)rng.NextDouble()), rh * (0.3f + 0.4f * (float)rng.NextDouble()));
+            Vector2 at = new(rw * (0.05f + 0.25f * (float)rng.NextDouble()), rh * (0.15f + 0.7f * (float)rng.NextDouble()));
             Word? prev = null;
             foreach (var w in line.Words)
             {
@@ -332,7 +337,7 @@ namespace Penumbra
                         c = at + new Vector2((float)Math.Cos(ang), (float)Math.Sin(ang)) * d;
                     }
                     c = Vector2.Clamp(c, lo, hi);
-                    float score = Math.Abs(c.Y - rh * 0.5f) * 0.2f;                 // drift around the middle
+                    float score = Math.Abs(c.Y - rh * 0.5f) * 0.05f;                // only a gentle pull to the middle
                     var settled = Box(c, w, Settled); var big = Box(c, w, 1);
                     foreach (var b in boxes) score += Overlap(settled, b) + 0.25f * Overlap(big, b);
                     if (score < bestScore) { bestScore = score; best = c; }
@@ -369,7 +374,8 @@ namespace Penumbra
                 float bottom = work.Bottom - (float)(14 * scale);
                 return new RawRectF(l + (w - width) / 2, bottom - (float)(210 * scale), l + (w + width) / 2, bottom);
             }
-            return new RawRectF(l + w * 0.12f, t + h * 0.16f, l + w * 0.88f, t + h * 0.8f);
+            // Constellation / Night sky: the middle 70% of the screen, clear of the corners
+            return new RawRectF(l + w * 0.15f, t + h * 0.15f, l + w * 0.85f, t + h * 0.85f);
         }
 
         /// <summary>Draw into the back buffer <paramref name="target"/>. The caller has already cleared

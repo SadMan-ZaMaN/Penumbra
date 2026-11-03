@@ -242,7 +242,18 @@
                 <WrapPanel x:Name="LyricsChoices" Margin="0,2,0,2">
                     <RadioButton Style="{StaticResource Seg}" GroupName="lyrics" Tag="Flow" Content="Flow" ToolTip="The line above the taskbar, words lighting up as they're sung"/>
                     <RadioButton Style="{StaticResource Seg}" GroupName="lyrics" Tag="Constellation" Content="Constellation" ToolTip="Words appear as stars joined by lines, the current word big"/>
+                    <RadioButton Style="{StaticResource Seg}" GroupName="lyrics" Tag="NightSky" Content="Night sky" ToolTip="The constellation on a pitch-black screen, glow still around the edges. Press Esc to show the taskbar."/>
                 </WrapPanel>
+                <Grid Margin="0,0,0,4" ToolTip="If the lyrics come too late, drag right; too early, drag left">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="Timing" Style="{StaticResource Label}"/>
+                    <Slider x:Name="LyricsTiming" Grid.Column="1" Minimum="-1" Maximum="1.5" SmallChange="0.05"/>
+                    <TextBlock x:Name="LyricsTimingText" Grid.Column="2" Width="70" TextAlignment="Right" VerticalAlignment="Center" Foreground="{StaticResource Subtle}"/>
+                </Grid>
                 <CheckBox x:Name="ShowInCapture" Style="{StaticResource Switch}" Content="Show in screenshots &amp; recordings"/>
                 <CheckBox x:Name="AutoStart" Style="{StaticResource Switch}" Content="Start with Windows"/>
             </StackPanel>

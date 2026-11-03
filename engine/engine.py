@@ -306,7 +306,10 @@ def main():
             hidden = is_placeholder(np_state["title"], np_state["artist"])   # Incognito: no real title
             lyrics.set_track(np_state["artist"], "" if hidden else np_state["title"],
                              np_state["album"], np_state["duration"])
-            cur, nxt, prog, lidx, lt, ld = lyrics.at(np_state["position"], args.lyrics_offset)
+            # the panel's "Lyrics timing" (seconds earlier; a little early by default, so a line is
+            # readable as it starts) plus --lyrics-offset
+            offset = args.lyrics_offset + float(settings.get("LyricsOffset", 0.3))
+            cur, nxt, prog, lidx, lt, ld = lyrics.at(np_state["position"], offset)
             if args.demo and not np_state["title"]:
                 cur, nxt, prog, lidx, lt, ld = demo_lyrics(now)
 
