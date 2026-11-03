@@ -207,6 +207,18 @@ namespace Penumbra
             if (!_s.Enabled) from += " · glow is switched off";
             else if (!sound && !_s.IdleGlow && _s.Mode == GlowMode.MusicSync) from += " · glow waits for sound";
             ColorInfo.Text = from;
+
+            // does this song have lyrics? (only worth saying while lyrics are switched on)
+            string lyrics = !_s.ShowLyrics || st == null ? "" : st.lstat switch
+            {
+                "found" => "♪ Lyrics found for this song",
+                "searching" => "Looking for lyrics…",
+                "none" => "No lyrics found for this song",
+                "private" => "No lyrics: private windows hide the song's title",
+                _ => "",
+            };
+            LyricsStatus.Text = lyrics;
+            LyricsStatus.Visibility = lyrics.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
             LiveColors.Background = new LinearGradientBrush(_glow.Primary, _glow.Secondary, 0);
         }
 

@@ -95,6 +95,17 @@ class Lyrics:
         self._tries = 0
         self._last_try = 0.0
 
+    @property
+    def status(self):
+        """'' (no track), 'searching', 'found' or 'none' (nothing on LRCLIB, as far as we can tell)."""
+        with self._lock:
+            if not self._key or not self._key[1]:
+                return ""
+            if self._lines:
+                return "found"
+            # only the first look counts as searching; the quiet retries after it don't flip it back
+            return "searching" if self._tries == 0 or (self._busy and self._tries == 1) else "none"
+
     def set_track(self, artist, title, album="", duration=None):
         """Call often (every frame is fine): looks lyrics up when the track changes, and again a few
         times if nothing was found."""

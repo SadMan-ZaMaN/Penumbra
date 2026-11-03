@@ -346,6 +346,8 @@ def main():
                 "title": np_state["title"], "artist": np_state["artist"],
                 "lyric": cur, "next": nxt, "lprog": round(prog, 3),
                 "lidx": lidx, "lt": round(lt, 3), "ld": round(ld, 3),
+                # for the panel: found / searching / none / private ('' = nothing playing)
+                "lstat": "private" if hidden and np_state["title"] else lyrics.status,
             }
             sock.sendto(json.dumps(pkt, ensure_ascii=False).encode("utf-8"), addr)
 

@@ -254,6 +254,7 @@
                     <Slider x:Name="LyricsTiming" Grid.Column="1" Minimum="-1" Maximum="1.5" SmallChange="0.05"/>
                     <TextBlock x:Name="LyricsTimingText" Grid.Column="2" Width="70" TextAlignment="Right" VerticalAlignment="Center" Foreground="{StaticResource Subtle}"/>
                 </Grid>
+                <TextBlock x:Name="LyricsStatus" Foreground="{StaticResource Subtle}" TextWrapping="Wrap" Margin="2,0,0,6" Visibility="Collapsed"/>
                 <CheckBox x:Name="ShowInCapture" Style="{StaticResource Switch}" Content="Show in screenshots &amp; recordings"/>
                 <CheckBox x:Name="AutoStart" Style="{StaticResource Switch}" Content="Start with Windows"/>
             </StackPanel>
