@@ -11,8 +11,16 @@ engine\.venv\Scripts\python -m pip install -r engine\requirements.txt || goto :e
 echo Building overlay ...
 dotnet build overlay -c Release || goto :err
 
+echo Adding Penumbra to the Start menu and the desktop ...
+powershell -NoProfile -ExecutionPolicy Bypass -Command ^
+  "$exe = '%~dp0overlay\bin\Release\net8.0-windows\Penumbra.exe'; $sh = New-Object -ComObject WScript.Shell;" ^
+  "foreach ($d in [Environment]::GetFolderPath('Programs'), [Environment]::GetFolderPath('Desktop')) {" ^
+  "$l = $sh.CreateShortcut((Join-Path $d 'Penumbra.lnk')); $l.TargetPath = $exe; $l.Arguments = '--panel';" ^
+  "$l.WorkingDirectory = Split-Path $exe; $l.IconLocation = '%~dp0overlay\Penumbra.ico,0';" ^
+  "$l.Description = 'Ambient light that moves with your music'; $l.Save() }"
+
 echo.
-echo Done. Start it with run.bat
+echo Done. Start it from the Start menu or the desktop icon (or run.bat)
 pause
 exit /b 0
 

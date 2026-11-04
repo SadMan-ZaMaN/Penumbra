@@ -1,6 +1,5 @@
 using System;
 using System.Drawing;
-using System.Drawing.Drawing2D;
 using System.Windows.Forms;
 using Microsoft.Win32;
 
@@ -54,7 +53,7 @@ namespace Penumbra
 
             _icon = new NotifyIcon
             {
-                Icon = MakeIcon(),
+                Icon = LoadIcon(),
                 Text = "Penumbra",
                 ContextMenuStrip = menu,
                 Visible = true,
@@ -138,19 +137,12 @@ namespace Penumbra
 
         static string Trim(string s, int n) => s.Length <= n ? s : s[..(n - 1)] + "…";
 
-        /// <summary>Draws a little glowing ring so we don't need an .ico file.</summary>
-        internal static Icon MakeIcon()
+        /// <summary>The app's icon (Penumbra.ico, built in) at the size Windows uses for small icons.
+        /// Its small sizes are the plain ring; the big ones (shortcuts, Start menu) are the eclipse.</summary>
+        internal static Icon LoadIcon()
         {
-            using var bmp = new Bitmap(32, 32);
-            using (var g = Graphics.FromImage(bmp))
-            {
-                g.SmoothingMode = SmoothingMode.AntiAlias;
-                using var brush = new LinearGradientBrush(new Rectangle(0, 0, 32, 32),
-                    Color.FromArgb(124, 92, 255), Color.FromArgb(255, 79, 163), 45f);
-                using var pen = new Pen(brush, 5);
-                g.DrawEllipse(pen, 4, 4, 24, 24);
-            }
-            return Icon.FromHandle(bmp.GetHicon());
+            using var s = typeof(Tray).Assembly.GetManifestResourceStream("Penumbra.ico")!;
+            return new Icon(s, SystemInformation.SmallIconSize);
         }
 
         public void Dispose()

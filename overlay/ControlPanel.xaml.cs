@@ -105,7 +105,7 @@ namespace Penumbra
                 if (IsVisible) { Load(); UpdateLive(); _live.Start(); } else _live.Stop();
             };
             SourceInitialized += (_, _) => Native.UseRoundedCorners(new WindowInteropHelper(this).Handle);
-            Icon = Imaging.CreateBitmapSourceFromHIcon(Tray.MakeIcon().Handle, Int32Rect.Empty, BitmapSizeOptions.FromEmptyOptions());
+            Icon = Imaging.CreateBitmapSourceFromHIcon(Tray.LoadIcon().Handle, Int32Rect.Empty, BitmapSizeOptions.FromEmptyOptions());
         }
 
         /// <summary>Pop up above the tray. With <paramref name="toggle"/>, a second call tucks it away again.</summary>

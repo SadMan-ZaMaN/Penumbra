@@ -62,12 +62,13 @@ cd Penumbra
 setup.bat
 ```
 
-`setup.bat` creates a Python environment in `engine\.venv`, installs the Python packages and builds the app. You only need to run it once, and again after updating the code.
+`setup.bat` creates a Python environment in `engine\.venv`, installs the Python packages, builds the app and adds **Penumbra to the Start menu and the desktop**. You only need to run it once, and again after updating the code.
 
 ### Run
 
 | | |
 |---|---|
+| **Penumbra icon** | In the Start menu or on the desktop (right-click it → *Pin to taskbar* if you like). Starts Penumbra and pops up its panel; clicking it again while it's running opens the panel. |
 | **`run.bat`** | Starts Penumbra. A ring icon appears in the tray. Running it again while Penumbra is running opens the panel, which is handy when Windows hides the tray icon. |
 | **`stop.bat`** | Quits Penumbra (same as **Quit Penumbra** in the panel). |
 | **Start with Windows** | A switch in the panel. |

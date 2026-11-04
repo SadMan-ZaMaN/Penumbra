@@ -10,6 +10,7 @@
     <AssemblyName>Penumbra</AssemblyName>
     <RootNamespace>Penumbra</RootNamespace>
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <ApplicationIcon>Penumbra.ico</ApplicationIcon>   <!-- the exe's icon: shortcuts, Start menu, taskbar -->
   </PropertyGroup>
 
   <ItemGroup>
@@ -21,6 +22,7 @@
 
   <ItemGroup>
     <EmbeddedResource Include="Glow.hlsl" LogicalName="Glow.hlsl" />
+    <EmbeddedResource Include="Penumbra.ico" LogicalName="Penumbra.ico" />   <!-- the same icon for the tray -->
   </ItemGroup>
 
 </Project>
