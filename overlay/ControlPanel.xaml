@@ -264,7 +264,7 @@
 
         <Grid>
         <Button x:Name="Reset" HorizontalAlignment="Right" VerticalAlignment="Center" Cursor="Hand"
-                Foreground="#f0f0f5" ToolTip="Reset the look: automatic colors, default thickness, glow, brightness…">
+                Foreground="#f0f0f5" ToolTip="Reset the look (automatic colors, default sizes and glow) and switch lyrics off (back to Flow)">
             <Button.Template>
                 <ControlTemplate TargetType="Button">
                     <Border x:Name="b" CornerRadius="7" Background="{StaticResource Control}" Width="32" Height="30">

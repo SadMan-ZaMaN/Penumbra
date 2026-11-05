@@ -90,7 +90,7 @@ Then play something: Spotify, YouTube in a browser, or any app that shows up in 
 | **Show lyrics** | **Flow**, **Constellation** or **Night sky**, plus a **Timing** slider if lyrics come early or late. The panel tells you whether the current song has lyrics. |
 | **Show in screenshots & recordings** | Off by default. Turn it on to record the glow. |
 | **OLED care** | On by default. Slowly moves the glow and lyrics a few pixels inward and back over 15 minutes, too slow to see, so the same pixels don't take all the wear. |
-| **↻** | Resets the look (colors, sizes, corners, motion) to the defaults. |
+| **↻** | Resets the look (colors, sizes, corners, motion) to the defaults, and switches lyrics off (back to Flow). |
 
 ### Night sky
 

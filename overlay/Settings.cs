@@ -47,10 +47,13 @@ namespace Penumbra
         public bool OledCare { get; set; } = true;       // slowly shift the glow a few px so the same pixels don't wear most
 
         /// <summary>Back to the default look: automatic colors, default thickness, glow, brightness,
-        /// waviness, corners, motion and smoothness. Behaviour switches (lyrics, start with Windows...) stay as they are.</summary>
+        /// waviness, corners, motion and smoothness, and lyrics off (back to Flow). Other behaviour
+        /// (lyrics timing, OLED care, start with Windows...) stays as it is.</summary>
         public void ResetLook()
         {
             var d = new Settings();
+            ShowLyrics = d.ShowLyrics;     // off
+            LyricsStyle = d.LyricsStyle;   // Flow
             Mode = d.Mode;
             Thickness = d.Thickness;
             Glow = d.Glow;
