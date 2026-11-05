@@ -98,12 +98,19 @@ class AutoLoopback:
     """LoopbackSource that survives errors and follows the default output device
     (plugging in headphones, switching to Bluetooth speakers, ...)."""
 
+    # When Bluetooth earbuds drop out and reconnect, the device keeps its name but Windows kills the
+    # old capture, which then delivers nothing, forever. Capture also delivers nothing while nothing
+    # plays, and the two look the same from here, so after this long without audio: reconnect.
+    STALE = 3.0
+
     def __init__(self):
         self.src = None
         self.name = "none"
         self.rate = 48000
         self.generation = 0          # bumps whenever the device (and maybe sample rate) changes
         self._lock = threading.Lock()
+        self._last_data = time.monotonic()
+        self._reopen = False
         self._open()
         threading.Thread(target=self._watch, daemon=True).start()
 
@@ -115,24 +122,37 @@ class AutoLoopback:
             return
         with self._lock:
             old, self.src = self.src, src
+            changed = (src.name, src.rate) != (self.name, self.rate)
             self.name, self.rate = src.name, src.rate
-            self.generation += 1
+            if changed:
+                self.generation += 1     # a new device: the beat detector starts over
+            self._last_data = time.monotonic()
         if old:
             old.close()
-        print(f"[engine] audio: {self.name} @ {self.rate} Hz", flush=True)
+        if changed:
+            print(f"[engine] audio: {self.name} @ {self.rate} Hz", flush=True)
 
     def _watch(self):
+        """Decides when to reconnect; the main loop does it (see blocks), because a capture only
+        opens from the thread that opened the first one: from here it fails ("host error")."""
         while True:
-            time.sleep(4)
+            time.sleep(2)
             try:
-                if self.src is None or not self.name.startswith(default_output_name()):
-                    self._open()
+                if (self.src is None or time.monotonic() - self._last_data > self.STALE
+                        or not self.name.startswith(default_output_name())):
+                    self._reopen = True
             except Exception:
                 pass
 
     def blocks(self):
+        if self._reopen:          # called from the main loop, so this is the right thread to reconnect on
+            self._reopen = False
+            self._open()
         with self._lock:
-            return self.src.blocks() if self.src else []
+            out = self.src.blocks() if self.src else []
+            if out:
+                self._last_data = time.monotonic()
+            return out
 
     def close(self):
         if self.src:
