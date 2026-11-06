@@ -32,6 +32,7 @@ namespace Penumbra
             var open = new ToolStripMenuItem("Open Penumbra…", null, (_, _) => _panel.Open());
             open.Font = new Font(open.Font, FontStyle.Bold);
             menu.Items.Add(open);
+            menu.Items.Add(new ToolStripMenuItem("Now playing screen", null, (_, _) => NowPlayingScreen.Open(glow, link)));
             menu.Items.Add(Toggle("Enabled", () => s.Enabled, v => s.Enabled = v));
             menu.Items.Add(Choice("Colors",
                 Src("Automatic (album art for music, screen for videos)", ColorSource.Auto),

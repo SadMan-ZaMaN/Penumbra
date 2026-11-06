@@ -8,9 +8,12 @@ Sends ~60 JSON packets/s over UDP to 127.0.0.1:47800, e.g.
     {"level":0.62,"bass":0.8,"mid":0.4,"high":0.2,"pulse":1.0,"beat":true,"bpm":124.0,
      "colors":["#7c5cff","#ff4fa3"],"source":"art","kind":"music","sound":true,"playing":true,
      "title":"...","artist":"...","lyric":"current line","next":"next line","lprog":0.4,
-     "lidx":12,"lt":1.3,"ld":2.6}   (line index, seconds into the line, est. seconds to sing it)
+     "lidx":12,"lt":1.3,"ld":2.6,   (line index, seconds into the line, est. seconds to sing it)
+     "art_id":7, "art":"<base64 JPEG>"}   (the cover, for the Now playing screen; "art" about once a second)
 """
 import argparse
+import base64
+import io
 import json
 import math
 import os
@@ -238,6 +241,20 @@ DEMO_LINES = [
 ]
 
 
+def art_jpeg_b64(thumb):
+    """The cover as a small JPEG in base64, for the overlay's Now playing screen. It only ever goes to
+    127.0.0.1, and stays well under a UDP packet's 64 KB."""
+    try:
+        from PIL import Image
+        im = Image.open(io.BytesIO(thumb)).convert("RGB")
+        im.thumbnail((300, 300))
+        buf = io.BytesIO()
+        im.save(buf, "JPEG", quality=90)
+        return base64.b64encode(buf.getvalue()).decode("ascii")
+    except Exception:
+        return ""
+
+
 def demo_lyrics(now, every=3.6):
     """Made-up lyric lines for --demo, so the lyrics can be tested without music."""
     i = int(now // every)
@@ -294,6 +311,7 @@ def main():
     colors = list(DEFAULT)
     source = "default"
     art_id = -1
+    art_b64, art_sent = "", 0.0      # the cover for the overlay, and when it was last sent
 
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     addr = ("127.0.0.1", args.port)
@@ -323,6 +341,7 @@ def main():
                 thumb = np_state.get("thumbnail")
                 if thumb:                    # no art yet: keep the last colors rather than flash to default
                     art_colors = dominant_colors(thumb)
+                art_b64, art_sent = (art_jpeg_b64(thumb) if thumb else ""), 0.0   # (but don't show an old cover)
             hidden = is_placeholder(np_state["title"], np_state["artist"])   # Incognito: no real title
             # lyrics are looked up (sending the title and artist to lrclib.net) only while they're switched on
             want_lyrics = bool(settings.get("ShowLyrics", False)) or args.demo
@@ -370,7 +389,11 @@ def main():
                 "lidx": lidx, "lt": round(lt, 3), "ld": round(ld, 3),
                 # for the panel: found / searching / none / private ('' = nothing playing)
                 "lstat": "" if not want_lyrics else "private" if hidden and np_state["title"] else lyrics.status,
+                "art_id": art_id,
             }
+            if art_b64 and now - art_sent > 1.0:   # the cover itself, about once a second (UDP can drop one)
+                pkt["art"] = art_b64
+                art_sent = now
             sock.sendto(json.dumps(pkt, ensure_ascii=False).encode("utf-8"), addr)
 
             if args.debug and now - last_dbg > 0.1:

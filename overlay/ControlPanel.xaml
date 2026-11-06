@@ -161,6 +161,27 @@
             <CheckBox x:Name="Enabled" Grid.Column="1" Style="{StaticResource Switch}" VerticalAlignment="Top" Margin="0,4,0,0"/>
         </Grid>
 
+        <!-- the full-screen player -->
+        <Button x:Name="NowPlayingButton" Cursor="Hand" Foreground="#f0f0f5" Margin="0,0,0,12"
+                ToolTip="A full-screen player: the song's cover, with the lyrics beside it. Esc closes it.">
+            <Button.Template>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="b" CornerRadius="10" Background="{StaticResource Card}" Padding="12,9">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="&#xE740;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="14"
+                                       VerticalAlignment="Center" Margin="0,0,10,0"/>
+                            <TextBlock Text="Now playing screen" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="b" Property="Background" Value="{StaticResource Accent}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Button.Template>
+        </Button>
+
         <!-- colors -->
         <TextBlock Text="COLORS" Style="{StaticResource Section}"/>
         <Border Style="{StaticResource CardBorder}">

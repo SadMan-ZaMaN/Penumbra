@@ -21,6 +21,10 @@ namespace Penumbra
                 return;
             }
 
+            // WPF (the panel and the Now playing screen) draws on the CPU. Both are mostly still pictures,
+            // and WPF's own GPU engine cost about 100 MB of RAM and 300 MB of GPU memory the moment a window
+            // first showed, kept until exit. The glow and lyrics don't use WPF: they stay on the GPU.
+            System.Windows.Media.RenderOptions.ProcessRenderMode = System.Windows.Interop.RenderMode.SoftwareOnly;
             var app = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
             var settings = Settings.Load();
 

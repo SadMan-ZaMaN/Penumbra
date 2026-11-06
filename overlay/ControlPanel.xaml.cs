@@ -49,6 +49,7 @@ namespace Penumbra
             MaxHeight = SystemParameters.WorkArea.Height - 24;
 
             Enabled.Click += (_, _) => Set(() => _s.Enabled = Enabled.IsChecked == true);
+            NowPlayingButton.Click += (_, _) => NowPlayingScreen.Open(_glow, _link);
             foreach (RadioButton r in SourceChoices.Children)
                 r.Checked += (_, _) => Set(() => _s.ColorSource = Enum.Parse<ColorSource>((string)r.Tag));
             foreach (RadioButton r in CornerChoices.Children)

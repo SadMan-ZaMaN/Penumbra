@@ -100,6 +100,12 @@ Night sky blacks out the **whole display**, taskbar included, while a song with 
 - Your apps keep running under the black, and clicks still reach them.
 - **Safety net:** if Penumbra ever stops responding while the screen is black, the black turns see-through after 3 seconds, and Penumbra closes itself after 10 seconds.
 
+### Now playing screen
+
+A full-screen player: the song's cover and name on a blurred copy of the cover, with the lyrics beside it. Open it from the **Now playing screen** button at the top of the panel, or from the tray menu. **Esc** closes it, and Alt+Tab works as usual.
+- Windows only gets a small cover from browsers (120 px from YouTube Music), so while this screen is open, Penumbra looks up a sharp one (1000 px) with Apple's free iTunes search. It only uses a result by the same artist with the same title, and keeps the small cover if there's none.
+- Work in progress: the progress bar and play / pause / skip buttons come next.
+
 ## How it works
 
 ```
@@ -108,7 +114,7 @@ Night sky blacks out the **whole display**, taskbar included, while a song with 
  │   → FFT → bass / mid / high, beats    │ ────────────────► │ Direct3D 11 shader: the glow          │
  │ now playing (Windows media controls)  │                   │ Direct2D / DirectWrite: the lyrics    │
  │   music → album art  → 2 colors       │                   │ DirectComposition → the desktop       │
- │   video → the screen → 2 colors       │                   │ WPF: the panel · tray icon            │
+ │   video → the screen → 2 colors       │                   │ WPF: panel · Now playing · tray icon  │
  │ LRCLIB → synced lyrics                │                   │ starts and stops the engine           │
  └───────────────────────────────────────┘                   └───────────────────────────────────────┘
 ```
@@ -146,7 +152,8 @@ Getting there took:
 
 - **Audio** is analysed in memory and never recorded or saved.
 - **The screen** is sampled as a tiny 64×40 picture, only to pick video colors, and never saved or sent anywhere.
-- **Lyrics:** only while **Show lyrics** is on, the song's title and artist are sent to lrclib.net to find them. Nothing else leaves your PC.
+- **Lyrics:** only while **Show lyrics** is on, the song's title and artist are sent to lrclib.net to find them.
+- **Covers:** only while the **Now playing screen** is open, the song's title and artist are sent to itunes.apple.com to find a sharp cover. Nothing else leaves your PC.
 - **What it writes:** only `%APPDATA%\Penumbra\settings.json`, and a "start with Windows" entry if you switch that on.
 - **OLED screens:** OLED care is on by default. Lower brightness and turning the glow off when you don't need it help most.
 - **Games:** an always-on-top window can cost a little FPS in full-screen games, so switch the glow off while gaming.
@@ -179,6 +186,8 @@ overlay/           C# (.NET 8): draws everything
   GlowController.cs  per-frame light: streams, smoothing, colors, beats
   LyricsRenderer.cs  lyrics: Flow, Constellation, Night sky (Direct2D)
   ControlPanel.xaml  the settings panel (+ .xaml.cs)
+  NowPlayingScreen.xaml  the full-screen player (+ .xaml.cs)
+  CoverLookup.cs     sharp covers from the iTunes search
   Tray.cs            tray icon and menu
   Settings.cs        settings, saved as JSON (the engine reads them too)
   Native.cs          Win32: click-through, always on top, hidden from capture, Esc watch

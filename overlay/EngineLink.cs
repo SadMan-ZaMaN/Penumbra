@@ -33,7 +33,12 @@ namespace Penumbra
         public double lt { get; set; }         // seconds into the line
         public double ld { get; set; }         // estimated seconds it takes to sing the line
         public string lstat { get; set; } = "";   // lyrics for this song: found / searching / none / private
+        public int art_id { get; set; } = -1;   // which cover the song has (changes with the song / when its art arrives)
+        public string art { get; set; } = "";    // that cover as a base64 JPEG, in about one packet a second
     }
+
+    /// <summary>A cover from the engine: its id and JPEG bytes (base64).</summary>
+    public sealed record CoverArt(int Id, string Jpeg);
 
     /// <summary>Receives engine packets on UDP 127.0.0.1:port on a background thread.</summary>
     public class EngineLink : IDisposable
@@ -61,6 +66,11 @@ namespace Penumbra
 
         public bool Connected => Stopwatch.GetElapsedTime(Interlocked.Read(ref _lastTicks)).TotalSeconds < 2;
 
+        /// <summary>The last cover the engine sent. Kept apart from the latest packet, because only about one
+        /// packet a second carries it and the readers don't see every packet.</summary>
+        public CoverArt? Art => _art;
+        volatile CoverArt? _art;
+
         void Loop()
         {
             var any = new IPEndPoint(IPAddress.Any, 0);
@@ -71,6 +81,11 @@ namespace Penumbra
                     var data = _udp.Receive(ref any);
                     var s = JsonSerializer.Deserialize<LightState>(data);
                     if (s == null) continue;
+                    if (s.art.Length > 0)
+                    {
+                        if (_art?.Id != s.art_id) _art = new CoverArt(s.art_id, s.art);
+                        s.art = "";   // the frame-by-frame state doesn't need to carry it around
+                    }
                     if (s.beat) Interlocked.Increment(ref _beats);
                     _latest = s;
                     Interlocked.Exchange(ref _lastTicks, Stopwatch.GetTimestamp());

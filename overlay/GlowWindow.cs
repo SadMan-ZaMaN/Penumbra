@@ -167,8 +167,9 @@ namespace Penumbra
                 var style = _settings.LyricsStyle;
                 _inset = OledInset(t);
                 if (_lyrics != null) _lyrics.Shift = new Vector2((float)_inset, (float)_inset);   // the lyrics drift too
-                _lyrics?.Update(_ctl.Last, _settings.ShowLyrics && _ctl.Last?.sound == true, style,
-                                LyricsRenderer.RegionFor(style, _work, _scale), dt, _scale);
+                var region = NowPlayingScreen.IsOpen ? NowPlayingScreen.LyricsArea(Width, Height)   // beside the cover
+                                                     : LyricsRenderer.RegionFor(style, _work, _scale);
+                _lyrics?.Update(_ctl.Last, _settings.ShowLyrics && _ctl.Last?.sound == true, style, region, dt, _scale);
                 if (_settings.Enabled != shown) { shown = _settings.Enabled; Native.Show(_hwnd, shown); }
                 if (!shown) { Thread.Sleep(100); continue; }
                 FollowNightSky(style, dt);
@@ -212,7 +213,9 @@ namespace Penumbra
         /// (or after Esc).</summary>
         void FollowNightSky(LyricsStyle style, double dt)
         {
-            double lyrics = !_black && style == LyricsStyle.NightSky && _settings.ShowLyrics ? _lyrics?.SongVisibility ?? 0 : 0;
+            // (the Now playing screen has its own background: no black over it)
+            double lyrics = !_black && style == LyricsStyle.NightSky && _settings.ShowLyrics && !NowPlayingScreen.IsOpen
+                            ? _lyrics?.SongVisibility ?? 0 : 0;
             var song = _ctl.Last?.title ?? "";
             if (lyrics < 0.003 || song != _song) BlackLifted = false;   // Night sky is over, or a new song: black again
             _song = song;
