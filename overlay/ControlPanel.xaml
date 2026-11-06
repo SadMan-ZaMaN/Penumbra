@@ -197,6 +197,9 @@
         <!-- look -->
         <TextBlock Text="LOOK" Style="{StaticResource Section}"/>
         <Border Style="{StaticResource CardBorder}">
+            <StackPanel>
+            <CheckBox x:Name="EdgeLight" Style="{StaticResource Switch}" Content="Edge light" Margin="0,0,0,6"
+                      ToolTip="The line of light around the screen. Lyrics and Night sky work with it off too."/>
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
@@ -231,6 +234,7 @@
                     <RadioButton Style="{StaticResource Seg}" GroupName="smooth" Tag="Saver" Content="Saver" ToolTip="About 30 frames a second: least CPU and battery"/>
                 </WrapPanel>
             </Grid>
+            </StackPanel>
         </Border>
 
         <!-- behaviour -->
