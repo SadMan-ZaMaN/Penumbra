@@ -110,8 +110,29 @@ class NowPlaying:
                            position=0.0, duration=0.0, stamp=time.monotonic(),
                            thumbnail=None, track_id=0, art_id=0)
         self._track_id = 0
+        self._aloop = None       # the polling thread's asyncio loop, and the session it's showing:
+        self._session = None     # the Now playing screen's buttons act on that one
         if AVAILABLE:
             threading.Thread(target=self._run, daemon=True).start()
+
+    def command(self, cmd):
+        """'toggle' (play/pause), 'next' or 'previous' for the session being shown. Safe from any
+        thread: it's run on the polling thread's loop, and returns at once."""
+        loop, session = self._aloop, self._session
+        if loop is None or session is None:
+            return
+
+        async def go():
+            try:
+                if cmd == "toggle":
+                    await session.try_toggle_play_pause_async()
+                elif cmd == "next":
+                    await session.try_skip_next_async()
+                elif cmd == "previous":
+                    await session.try_skip_previous_async()
+            except Exception:
+                pass
+        asyncio.run_coroutine_threadsafe(go(), loop)
 
     def snapshot(self):
         """Current state with the playback position extrapolated to *now*."""
@@ -127,6 +148,7 @@ class NowPlaying:
         asyncio.run(self._loop())
 
     async def _loop(self):
+        self._aloop = asyncio.get_running_loop()
         manager = await MediaManager.request_async()
         last_key = None
         thumb_tries = 0
@@ -134,6 +156,7 @@ class NowPlaying:
         while True:
             try:
                 session = _pick_session(manager)
+                self._session = session
                 if session is None:
                     with self._lock:
                         self._state.update(playing=False, title="", artist="", kind="none")

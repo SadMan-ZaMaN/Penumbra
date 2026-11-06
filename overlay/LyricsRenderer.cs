@@ -592,11 +592,12 @@ namespace Penumbra
                 h0 = Height(b0);
             }
 
-            float up = y;   // the lines just sung
+            float up = y;   // the lines just sung, fading out by the top (gone before they're cut off)
             for (int k = 1; k <= 2 && Made(_listIdx - k) is Stencil b; k++)
             {
                 up -= gap + Height(b);
-                Paint(ctx, b, Matrix3x2.CreateTranslation(0, up) * origin, new Color4(1, 1, 1, (k == 1 ? 0.3f : 0.15f) * a));
+                float fade = (float)Smooth(up / (rh * 0.12));
+                Paint(ctx, b, Matrix3x2.CreateTranslation(0, up) * origin, new Color4(1, 1, 1, (k == 1 ? 0.3f : 0.15f) * fade * a));
             }
             float down = y + h0;   // the lines to come, fading out by the bottom of the area (gone as they touch it)
             for (int k = 1; down < rh && Made(_listIdx + k) is Stencil b; k++)

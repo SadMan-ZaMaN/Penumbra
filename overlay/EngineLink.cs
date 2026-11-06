@@ -35,6 +35,8 @@ namespace Penumbra
         public string lstat { get; set; } = "";   // lyrics for this song: found / searching / none / private
         public int art_id { get; set; } = -1;   // which cover the song has (changes with the song / when its art arrives)
         public string art { get; set; } = "";    // that cover as a base64 JPEG, in about one packet a second
+        public double pos { get; set; }          // seconds into the song (for the Now playing screen's bar)
+        public double dur { get; set; }          // the song's length in seconds (0 = unknown)
         public int lyr_id { get; set; } = -1;    // which lyrics the song has (changes with the song / when they arrive)
         public List<string>? lines { get; set; } // all of them (lidx indexes these), in about one packet a second
     }
@@ -54,9 +56,12 @@ namespace Penumbra
         long _lastTicks;
         int _beats;   // beats since last Take(); a beat can fall between rendered frames
 
+        readonly IPEndPoint _buttons;   // where the engine listens for the Now playing screen's buttons
+
         public EngineLink(int port = 47800)
         {
             _udp = new UdpClient(new IPEndPoint(IPAddress.Loopback, port));
+            _buttons = new IPEndPoint(IPAddress.Loopback, port + 10);
             _thread = new Thread(Loop) { IsBackground = true, Name = "EngineLink" };
             _thread.Start();
         }
@@ -70,6 +75,17 @@ namespace Penumbra
         }
 
         public bool Connected => Stopwatch.GetElapsedTime(Interlocked.Read(ref _lastTicks)).TotalSeconds < 2;
+
+        /// <summary>Ask the engine to "toggle" (play / pause), "next" or "previous" the song that's playing.</summary>
+        public void Send(string cmd)
+        {
+            try
+            {
+                var data = System.Text.Encoding.UTF8.GetBytes($"{{\"cmd\":\"{cmd}\"}}");
+                _udp.Send(data, data.Length, _buttons);
+            }
+            catch { /* engine not running: nothing to do */ }
+        }
 
         /// <summary>The last cover the engine sent. Kept apart from the latest packet, because only about one
         /// packet a second carries it and the readers don't see every packet.</summary>

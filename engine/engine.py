@@ -267,6 +267,26 @@ def demo_lyrics(now, every=3.6):
 DEMO_SONG = 200   # the demo "song" is its lines over and over, 200 of them (for the lyrics list)
 
 
+def listen_for_buttons(port, media):
+    """The Now playing screen's buttons: {"cmd": "toggle" / "next" / "previous"} from the overlay, on
+    127.0.0.1 only (nothing outside this PC can reach it)."""
+    def run():
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        try:
+            sock.bind(("127.0.0.1", port))
+        except OSError:
+            return              # taken (another engine?): this one just has no buttons
+        while True:
+            try:
+                data, _ = sock.recvfrom(4096)
+                cmd = json.loads(data).get("cmd", "")
+                if cmd in ("toggle", "next", "previous"):
+                    media.command(cmd)
+            except Exception:
+                pass
+    threading.Thread(target=run, daemon=True).start()
+
+
 def watch_parent(pid):
     """Quit when the overlay quits (or crashes), so no orphan engine keeps running."""
     import os
@@ -307,6 +327,8 @@ def main():
     generation = getattr(src, "generation", 0)
     det = BeatDetector(sample_rate=src.rate, block_size=BLOCK)
     media = NowPlaying()
+    if hasattr(media, "command"):
+        listen_for_buttons(args.port + 10, media)   # 47810 by default
     lyrics = Lyrics()
     settings = OverlaySettings()
     sampler = ScreenSampler()
@@ -395,6 +417,8 @@ def main():
                 # for the panel: found / searching / none / private ('' = nothing playing)
                 "lstat": "" if not want_lyrics else "private" if hidden and np_state["title"] else lyrics.status,
                 "art_id": art_id,
+                # for the Now playing screen's progress bar: seconds into the song, and its length (0 = unknown)
+                "pos": round(np_state["position"], 2), "dur": round(np_state["duration"], 1),
             }
             if art_b64 and now - art_sent > 1.0:   # the cover itself, about once a second (UDP can drop one)
                 pkt["art"] = art_b64

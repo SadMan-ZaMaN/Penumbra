@@ -4,6 +4,32 @@
         Title="Now playing · Penumbra" WindowStyle="None" ResizeMode="NoResize" ShowInTaskbar="True"
         WindowStartupLocation="Manual" Background="Black" Foreground="White"
         FontFamily="Segoe UI Variable Display, Segoe UI">
+    <Window.Resources>
+        <!-- a round icon button: slightly see-through, fully white under the mouse -->
+        <Style x:Key="IconButton" TargetType="Button">
+            <Setter Property="Focusable" Value="False"/>   <!-- so Space is play / pause, not "press the last button" -->
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Setter Property="FontFamily" Value="Segoe Fluent Icons, Segoe MDL2 Assets"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="b" Width="{TemplateBinding Width}" Height="{TemplateBinding Height}" CornerRadius="33"
+                                Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}" Opacity="0.86">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="b" Property="Opacity" Value="1"/></Trigger>
+                            <Trigger Property="IsPressed" Value="True"><Setter TargetName="b" Property="Opacity" Value="0.6"/></Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
     <Grid>
         <!-- the cover, blurred and darkened, filling the screen -->
         <Image x:Name="Backdrop" Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality"/>
@@ -28,6 +54,30 @@
                         <TextBlock x:Name="SongArtist" Margin="2,2,0,0" FontSize="23" Opacity="0.72" TextTrimming="CharacterEllipsis"/>
                     </StackPanel>
                 </Border>
+
+                <!-- progress: how far into the song, with the time gone and the time left under it -->
+                <Canvas x:Name="Progress" Canvas.Left="220" Canvas.Top="612" Width="360" Height="40" Visibility="Hidden">
+                    <Border Canvas.Top="4" Width="360" Height="4" CornerRadius="2" Background="#46FFFFFF"/>
+                    <Border x:Name="BarFill" Canvas.Top="4" Width="0" Height="4" CornerRadius="2" Background="#EBFFFFFF"/>
+                    <Ellipse x:Name="BarKnob" Canvas.Top="-0.5" Width="13" Height="13" Fill="White"/>
+                    <TextBlock x:Name="Elapsed" Canvas.Top="19" FontSize="16" FontWeight="SemiBold" Opacity="0.63"/>
+                    <TextBlock x:Name="Remaining" Canvas.Top="19" Width="360" TextAlignment="Right" FontSize="16" FontWeight="SemiBold" Opacity="0.63"/>
+                </Canvas>
+
+                <!-- previous / play-pause / next -->
+                <Grid Canvas.Left="210" Canvas.Top="687" Width="380" Height="66">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition/>
+                    </Grid.ColumnDefinitions>
+                    <Button x:Name="Prev" Style="{StaticResource IconButton}" Content="&#xE892;" FontSize="26"
+                            Width="56" Height="56" HorizontalAlignment="Right" Margin="0,0,30,0" ToolTip="Previous"/>
+                    <Button x:Name="PlayPause" Grid.Column="1" Style="{StaticResource IconButton}" Content="&#xE769;" FontSize="28"
+                            Width="66" Height="66" Background="#24FFFFFF" BorderBrush="#78FFFFFF" BorderThickness="1.5" ToolTip="Play / pause (Space)"/>
+                    <Button x:Name="Next" Grid.Column="2" Style="{StaticResource IconButton}" Content="&#xE893;" FontSize="26"
+                            Width="56" Height="56" HorizontalAlignment="Left" Margin="30,0,0,0" ToolTip="Next"/>
+                </Grid>
 
                 <TextBlock Canvas.Left="1310" Canvas.Top="35" Text="Esc to close" FontSize="15" FontWeight="SemiBold" Opacity="0.35"/>
             </Canvas>

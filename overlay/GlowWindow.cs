@@ -174,7 +174,9 @@ namespace Penumbra
                     _lyrics.ListMode = NowPlayingScreen.IsOpen;   // Flow there: the whole song as a list
                     _lyrics.Song = _ctl.Link.Lyrics;
                 }
-                _lyrics?.Update(_ctl.Last, _settings.ShowLyrics && _ctl.Last?.sound == true, style, region, dt, _scale);
+                // lyrics show while there's sound; on the Now playing screen they also stay while paused
+                bool showLyrics = _settings.ShowLyrics && (_ctl.Last?.sound == true || NowPlayingScreen.IsOpen && _ctl.Last != null);
+                _lyrics?.Update(_ctl.Last, showLyrics, style, region, dt, _scale);
                 if (_settings.Enabled != shown) { shown = _settings.Enabled; Native.Show(_hwnd, shown); }
                 if (!shown) { Thread.Sleep(100); continue; }
                 FollowNightSky(style, dt);

@@ -64,7 +64,14 @@ namespace Penumbra
             Width = SystemParameters.PrimaryScreenWidth;
             Height = SystemParameters.PrimaryScreenHeight;
             Icon = Imaging.CreateBitmapSourceFromHIcon(Tray.LoadIcon().Handle, Int32Rect.Empty, BitmapSizeOptions.FromEmptyOptions());
-            KeyDown += (_, e) => { if (e.Key == Key.Escape) Close(); };
+            KeyDown += (_, e) =>
+            {
+                if (e.Key == Key.Escape) Close();
+                else if (e.Key == Key.Space) { TogglePlay(); e.Handled = true; }
+            };
+            Prev.Click += (_, _) => _link.Send("previous");
+            Next.Click += (_, _) => _link.Send("next");
+            PlayPause.Click += (_, _) => TogglePlay();
 
             _tick = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
             _tick.Tick += (_, _) => Refresh();
@@ -109,6 +116,22 @@ namespace Penumbra
                 if (bmp != null) ShowCover(bmp);
             }
 
+            // the progress bar and times (hidden when the length isn't known, e.g. a live stream)
+            if (s != null && s.dur > 1)
+            {
+                double f = Math.Clamp(s.pos / s.dur, 0, 1);
+                BarFill.Width = 360 * f;
+                System.Windows.Controls.Canvas.SetLeft(BarKnob, 360 * f - 6.5);
+                Elapsed.Text = Clock(s.pos);
+                Remaining.Text = "-" + Clock(s.dur - s.pos);
+                Progress.Visibility = Visibility.Visible;
+            }
+            else Progress.Visibility = Visibility.Hidden;
+
+            // play or pause icon: what's happening, unless a click just changed it (the engine confirms within a second)
+            bool playing = s?.playing == true;
+            if (DateTime.UtcNow > _iconHeld && playing != _playingShown) ShowPlaying(playing);
+
             // Night sky: the blurred background fades to black (and back) over the window's black
             double want = 1 - Night;
             if (Math.Abs(want - _backdropTo) > 0.02 || ((want == 0 || want == 1) && want != _backdropTo))
@@ -116,6 +139,28 @@ namespace Penumbra
                 _backdropTo = want;
                 Backdrop.BeginAnimation(OpacityProperty, new System.Windows.Media.Animation.DoubleAnimation(want, TimeSpan.FromSeconds(0.6)));
             }
+        }
+
+        bool _playingShown = true;
+        DateTime _iconHeld;
+
+        void TogglePlay()
+        {
+            _link.Send("toggle");
+            ShowPlaying(!_playingShown);                      // show it at once...
+            _iconHeld = DateTime.UtcNow.AddSeconds(1.5);      // ...and give the player a moment to catch up
+        }
+
+        void ShowPlaying(bool playing)
+        {
+            _playingShown = playing;
+            PlayPause.Content = playing ? "" : "";   // pause : play
+        }
+
+        static string Clock(double seconds)
+        {
+            int s = (int)Math.Max(0, seconds);
+            return $"{s / 60}:{s % 60:00}";
         }
 
         async void FindSharpCover(string artist, string title, string key)

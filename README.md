@@ -108,7 +108,8 @@ A full-screen player: the song's cover and name on a blurred copy of the cover, 
   - **Constellation** draws its stars there.
   - **Night sky** fades the blurred background to black, keeping the cover and the stars.
 - Windows only gets a small cover from browsers (120 px from YouTube Music), so while this screen is open, Penumbra looks up a sharp one (1000 px) with Apple's free iTunes search. It only uses a result by the same artist with the same title, and keeps the small cover if there's none.
-- Work in progress: the progress bar and play / pause / skip buttons come next.
+- **Under the cover:** a progress bar with the time gone and the time left, and **previous / play-pause / next** buttons. **Space** plays and pauses too. They control whatever is playing, through Windows' media controls (the same ones your keyboard's media keys use). The lyrics stay on screen while paused.
+- Work in progress: dragging the bar to jump within the song comes next.
 
 ## How it works
 
@@ -158,6 +159,7 @@ Getting there took:
 - **The screen** is sampled as a tiny 64×40 picture, only to pick video colors, and never saved or sent anywhere.
 - **Lyrics:** only while **Show lyrics** is on, the song's title and artist are sent to lrclib.net to find them.
 - **Covers:** only while the **Now playing screen** is open, the song's title and artist are sent to itunes.apple.com to find a sharp cover. Nothing else leaves your PC.
+- **The player buttons** reach the engine over `127.0.0.1` only, so nothing outside your PC can press them.
 - **What it writes:** only `%APPDATA%\Penumbra\settings.json`, and a "start with Windows" entry if you switch that on.
 - **OLED screens:** OLED care is on by default. Lower brightness and turning the glow off when you don't need it help most.
 - **Games:** an always-on-top window can cost a little FPS in full-screen games, so switch the glow off while gaming.
