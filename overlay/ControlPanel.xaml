@@ -158,29 +158,27 @@
                 <TextBlock Text="Penumbra" FontSize="17" FontWeight="SemiBold"/>
                 <TextBlock x:Name="NowPlaying" Text="Listening…" Foreground="{StaticResource Subtle}" TextTrimming="CharacterEllipsis" Margin="0,2,0,0"/>
             </StackPanel>
-            <CheckBox x:Name="Enabled" Grid.Column="1" Style="{StaticResource Switch}" VerticalAlignment="Top" Margin="0,4,0,0"/>
+            <!-- the full-screen player (opens / closes it), small so the panel still fits the screen -->
+            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top">
+                <Button x:Name="NowPlayingButton" Cursor="Hand" Foreground="#f0f0f5" Margin="0,0,10,0"
+                        ToolTip="Now playing screen: the song's cover, with the lyrics beside it">
+                    <Button.Template>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="b" CornerRadius="7" Background="{StaticResource Control}" Width="32" Height="30">
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="b" Property="Background" Value="{StaticResource Accent}"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Button.Template>
+                    <TextBlock x:Name="NowPlayingIcon" Text="&#xE740;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="14"/>
+                </Button>
+                <CheckBox x:Name="Enabled" Style="{StaticResource Switch}" Margin="0,4,0,0"/>
+            </StackPanel>
         </Grid>
-
-        <!-- the full-screen player -->
-        <Button x:Name="NowPlayingButton" Cursor="Hand" Foreground="#f0f0f5" Margin="0,0,0,12"
-                ToolTip="A full-screen player: the song's cover, with the lyrics beside it. Esc closes it.">
-            <Button.Template>
-                <ControlTemplate TargetType="Button">
-                    <Border x:Name="b" CornerRadius="10" Background="{StaticResource Card}" Padding="12,9">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="&#xE740;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="14"
-                                       VerticalAlignment="Center" Margin="0,0,10,0"/>
-                            <TextBlock Text="Now playing screen" VerticalAlignment="Center"/>
-                        </StackPanel>
-                    </Border>
-                    <ControlTemplate.Triggers>
-                        <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="b" Property="Background" Value="{StaticResource Accent}"/>
-                        </Trigger>
-                    </ControlTemplate.Triggers>
-                </ControlTemplate>
-            </Button.Template>
-        </Button>
 
         <!-- colors -->
         <TextBlock Text="COLORS" Style="{StaticResource Section}"/>

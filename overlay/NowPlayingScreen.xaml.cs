@@ -5,6 +5,7 @@ using System.Windows;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using Vortice;
@@ -39,12 +40,21 @@ namespace Penumbra
         CancellationTokenSource? _lookup;
         static (string key, byte[] jpeg)? _sharpCache;   // the last sharp cover found (one song's worth)
 
+        /// <summary>Opens the settings panel (set by the tray, which owns it): the screen covers the tray icon.</summary>
+        public static Action? ShowPanel;
+
         public static void Open(GlowController glow, EngineLink link)
         {
             _open ??= new NowPlayingScreen(glow, link);
             _open.Show();
             _open.Activate();
         }
+
+        /// <summary>Close it (with its fade), if it's open.</summary>
+        public static void CloseIfOpen() => _open?.FadeAndClose();
+
+        /// <summary>Open and not on its way out (for the panel's open / close button).</summary>
+        public static bool Showing => _open != null && !_open._closing;
 
         /// <summary>The lyrics area in screen pixels, for a window <paramref name="w"/> x <paramref name="h"/>
         /// (the canvas is scaled to fit and centred, like the Viewbox does).</summary>
@@ -66,8 +76,20 @@ namespace Penumbra
             Icon = Imaging.CreateBitmapSourceFromHIcon(Tray.LoadIcon().Handle, Int32Rect.Empty, BitmapSizeOptions.FromEmptyOptions());
             KeyDown += (_, e) =>
             {
-                if (e.Key == Key.Escape) Close();
+                if (e.Key == Key.Escape) FadeAndClose();
                 else if (e.Key == Key.Space) { TogglePlay(); e.Handled = true; }
+            };
+            SettingsButton.Click += (_, _) => ShowPanel?.Invoke();
+            CloseButton.Click += (_, _) => FadeAndClose();
+            Loaded += (_, _) => Fade(Root, 0, 1, 0.35);
+            // the cursor hides after a few seconds without moving, like a video player
+            MouseMove += (_, e) =>
+            {
+                var p = PointToScreen(e.GetPosition(this));
+                if (Math.Abs(p.X - _mouseAt.X) + Math.Abs(p.Y - _mouseAt.Y) < 3) return;   // not a real move
+                _mouseAt = p;
+                _lastMove = DateTime.UtcNow;
+                if (ForceCursor) { ForceCursor = false; Cursor = null; }
             };
             Prev.Click += (_, _) => _link.Send("previous");
             Next.Click += (_, _) => _link.Send("next");
@@ -112,9 +134,11 @@ namespace Penumbra
                 _key = key;
                 _sharp = false;
                 _artShown = int.MinValue;
+                _coverFor = "";                       // the old song's cover stays until the new one arrives
+                _songAt = DateTime.UtcNow;
                 SongTitle.Text = title.Length == 0 ? "Nothing playing" : hidden ? "Playing in a private window" : title;
                 SongArtist.Text = hidden ? "" : artist;
-                ShowCover(null);
+                if (title.Length == 0) ShowCover(null);
                 _lookup?.Cancel();
                 _lookup = null;
                 if (title.Length > 0 && !hidden) FindSharpCover(artist, title, key);
@@ -126,6 +150,14 @@ namespace Penumbra
                 _artShown = art.Id;
                 var bmp = Decode(Convert.FromBase64String(art.Jpeg), 0);
                 if (bmp != null) ShowCover(bmp);
+            }
+            // no cover at all for this song after a moment: the placeholder
+            if (_coverFor != _key && DateTime.UtcNow - _songAt > TimeSpan.FromSeconds(2.5)) ShowCover(null);
+
+            if (!_dragging && !ForceCursor && IsActive && DateTime.UtcNow - _lastMove > TimeSpan.FromSeconds(3))
+            {
+                ForceCursor = true;                   // (overrides the buttons' hand cursor too)
+                Cursor = Cursors.None;
             }
 
             // the progress bar and times (hidden when the length isn't known, e.g. a live stream)
@@ -152,12 +184,29 @@ namespace Penumbra
             if (Math.Abs(want - _backdropTo) > 0.02 || ((want == 0 || want == 1) && want != _backdropTo))
             {
                 _backdropTo = want;
-                Backdrop.BeginAnimation(OpacityProperty, new System.Windows.Media.Animation.DoubleAnimation(want, TimeSpan.FromSeconds(0.6)));
+                BackdropLayer.BeginAnimation(OpacityProperty, new DoubleAnimation(want, TimeSpan.FromSeconds(0.6)));
             }
         }
 
         bool _playingShown = true;
         DateTime _iconHeld;
+        string _coverFor = "\0";                 // the song whose cover is showing
+        DateTime _songAt, _lastMove = DateTime.UtcNow;
+        Point _mouseAt;
+        bool _closing;
+
+        /// <summary>Fade out, then close.</summary>
+        void FadeAndClose()
+        {
+            if (_closing) return;
+            _closing = true;
+            var a = new DoubleAnimation(0, TimeSpan.FromSeconds(0.25));
+            a.Completed += (_, _) => Close();
+            Root.BeginAnimation(OpacityProperty, a);
+        }
+
+        static void Fade(UIElement e, double from, double to, double seconds) =>
+            e.BeginAnimation(OpacityProperty, new DoubleAnimation(from, to, TimeSpan.FromSeconds(seconds)));
 
         void TogglePlay()
         {
@@ -224,14 +273,33 @@ namespace Penumbra
             ShowCover(bmp);
         }
 
-        /// <summary>Show a cover (null: the placeholder) and the blurred background made from it.</summary>
+        static readonly Brush Placeholder = MakePlaceholder();
+
+        static Brush MakePlaceholder()
+        {
+            var b = new LinearGradientBrush(Color.FromRgb(0x7c, 0x5c, 0xff), Color.FromRgb(0xff, 0x4f, 0xa3), 45);
+            b.Freeze();
+            return b;
+        }
+
+        /// <summary>Show a cover (null: the placeholder) and the blurred background made from it, each
+        /// fading in over the last one.</summary>
         void ShowCover(BitmapSource? bmp)
         {
-            Cover.ImageSource = bmp;
-            CoverBox.Background = bmp != null ? Cover
-                : new LinearGradientBrush(Color.FromRgb(0x7c, 0x5c, 0xff), Color.FromRgb(0xff, 0x4f, 0xa3), 45);
-            CoverNote.Visibility = bmp != null ? Visibility.Collapsed : Visibility.Visible;
+            _coverFor = _key;
+            var brush = bmp != null ? new ImageBrush(bmp) { Stretch = Stretch.UniformToFill } : Placeholder;
+            if (ReferenceEquals(brush, CoverBox.Background)) return;   // the placeholder again: nothing changes
+            CoverOld.Background = CoverBox.Background;
+            CoverBox.Background = brush;
+            Fade(CoverBox, 0, 1, 0.5);
+            CoverNote.BeginAnimation(OpacityProperty, new DoubleAnimation(bmp != null ? 0 : 0.55, TimeSpan.FromSeconds(0.5)));
+
+            BackdropOld.BeginAnimation(OpacityProperty, null);
+            BackdropOld.Opacity = 1;
+            BackdropOld.Source = Backdrop.Source;
             Backdrop.Source = bmp != null ? MakeBackdrop(bmp) : null;
+            if (Backdrop.Source != null) Fade(Backdrop, 0, 1, 0.8);   // the new one over the old
+            else Fade(BackdropOld, 1, 0, 0.8);                        // none: the old one fades to black
         }
 
         static BitmapSource? Decode(byte[] bytes, int width)

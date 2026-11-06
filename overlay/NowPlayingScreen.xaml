@@ -30,9 +30,14 @@
             </Setter>
         </Style>
     </Window.Resources>
-    <Grid>
-        <!-- the cover, blurred and darkened, filling the screen -->
-        <Image x:Name="Backdrop" Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality"/>
+    <!-- the whole screen fades in when it opens and out when it closes -->
+    <Grid x:Name="Root" Opacity="0">
+        <!-- the cover, blurred and darkened, filling the screen. Two layers, so a new song's can fade in over
+             the last one's; the layer as a whole fades to black for Night sky. -->
+        <Grid x:Name="BackdropLayer">
+            <Image x:Name="BackdropOld" Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality"/>
+            <Image x:Name="Backdrop" Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality"/>
+        </Grid>
 
         <!-- everything else is laid out on a 1440 x 900 canvas (the screen at 200%) and scaled to fit -->
         <Viewbox Stretch="Uniform">
@@ -42,11 +47,8 @@
                         Background="#14FFFFFF" BorderBrush="#26FFFFFF" BorderThickness="1">
                     <StackPanel Margin="19">
                         <Grid Width="340" Height="340">
-                            <Border x:Name="CoverBox" CornerRadius="13">
-                                <Border.Background>
-                                    <ImageBrush x:Name="Cover" Stretch="UniformToFill"/>
-                                </Border.Background>
-                            </Border>
+                            <Border x:Name="CoverOld" CornerRadius="13"/>   <!-- the last cover, while the new one fades in -->
+                            <Border x:Name="CoverBox" CornerRadius="13"/>
                             <TextBlock x:Name="CoverNote" Text="♪" FontSize="120" Opacity="0.55"
                                        HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Grid>
@@ -81,7 +83,13 @@
                             Width="56" Height="56" HorizontalAlignment="Left" Margin="30,0,0,0" ToolTip="Next"/>
                 </Grid>
 
-                <TextBlock Canvas.Left="1310" Canvas.Top="35" Text="Esc to close" FontSize="15" FontWeight="SemiBold" Opacity="0.35"/>
+                <!-- top right: the settings panel, and close (Esc does that too) -->
+                <StackPanel Canvas.Left="1324" Canvas.Top="24" Orientation="Horizontal" Opacity="0.55">
+                    <Button x:Name="SettingsButton" Style="{StaticResource IconButton}" Content="&#xE713;" FontSize="18"
+                            Width="42" Height="42" ToolTip="Penumbra settings"/>
+                    <Button x:Name="CloseButton" Style="{StaticResource IconButton}" Content="&#xE711;" FontSize="18"
+                            Width="42" Height="42" Margin="8,0,0,0" ToolTip="Close (Esc)"/>
+                </StackPanel>
             </Canvas>
         </Viewbox>
     </Grid>

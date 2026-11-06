@@ -102,7 +102,7 @@ Night sky blacks out the **whole display**, taskbar included, while a song with 
 
 ### Now playing screen
 
-A full-screen player: the song's cover and name on a blurred copy of the cover, with the lyrics beside it. Open it from the **Now playing screen** button at the top of the panel, or from the tray menu. **Esc** closes it, and Alt+Tab works as usual.
+A full-screen player: the song's cover and name on a blurred copy of the cover, with the lyrics beside it. Open it with the **⤢** button at the top of the panel, or from the tray menu. Close it with **Esc**, the **✕** in its top-right corner, or the same panel button. Its **⚙** opens the settings panel on top, so you can change the style while you watch. Alt+Tab works as usual, the mouse cursor hides when you leave it still, and covers and backgrounds crossfade from song to song.
 - **Lyrics** (with **Show lyrics** on) sit beside the cover, in your chosen style:
   - **Flow** becomes a scrolling list, like YouTube Music or Spotify: the line being sung fills in word by word, the one just sung sits dimmer above, the next ones wait below, and the list glides up line by line.
   - **Constellation** draws its stars there.

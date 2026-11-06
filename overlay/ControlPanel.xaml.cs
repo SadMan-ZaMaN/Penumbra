@@ -49,7 +49,13 @@ namespace Penumbra
             MaxHeight = SystemParameters.WorkArea.Height - 24;
 
             Enabled.Click += (_, _) => Set(() => _s.Enabled = Enabled.IsChecked == true);
-            NowPlayingButton.Click += (_, _) => NowPlayingScreen.Open(_glow, _link);
+            NowPlayingButton.Click += (_, _) =>   // opens it, or closes it if it's showing
+            {
+                bool opening = !NowPlayingScreen.Showing;
+                if (opening) NowPlayingScreen.Open(_glow, _link);
+                else NowPlayingScreen.CloseIfOpen();
+                UpdateNowPlayingButton(opening);
+            };
             foreach (RadioButton r in SourceChoices.Children)
                 r.Checked += (_, _) => Set(() => _s.ColorSource = Enum.Parse<ColorSource>((string)r.Tag));
             foreach (RadioButton r in CornerChoices.Children)
@@ -190,8 +196,16 @@ namespace Penumbra
         }
 
         /// <summary>What's playing, and the colors the glow is showing right now.</summary>
+        void UpdateNowPlayingButton(bool showing)
+        {
+            NowPlayingButton.ToolTip = showing ? "Close the Now playing screen"
+                                               : "Now playing screen: the song's cover, with the lyrics beside it";
+            NowPlayingIcon.Text = showing ? "" : "";   // back to window : full screen
+        }
+
         void UpdateLive()
         {
+            UpdateNowPlayingButton(NowPlayingScreen.Showing);
             var st = _glow.Last;
             bool sound = st != null && st.sound;
             NowPlaying.Text =

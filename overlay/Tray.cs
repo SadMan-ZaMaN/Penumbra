@@ -29,10 +29,14 @@ namespace Penumbra
 
             // the panel has every setting; this menu keeps the quick ones
             _panel = new ControlPanel(s, glow, link, Changed, exit);
+            NowPlayingScreen.ShowPanel = () => _panel.Open(toggle: false);   // its ⚙ button: the tray icon is covered
             var open = new ToolStripMenuItem("Open Penumbra…", null, (_, _) => _panel.Open());
             open.Font = new Font(open.Font, FontStyle.Bold);
             menu.Items.Add(open);
-            menu.Items.Add(new ToolStripMenuItem("Now playing screen", null, (_, _) => NowPlayingScreen.Open(glow, link)));
+            menu.Items.Add(new ToolStripMenuItem("Now playing screen", null, (_, _) =>
+            {
+                if (NowPlayingScreen.Showing) NowPlayingScreen.CloseIfOpen(); else NowPlayingScreen.Open(glow, link);
+            }));
             menu.Items.Add(Toggle("Enabled", () => s.Enabled, v => s.Enabled = v));
             menu.Items.Add(Choice("Colors",
                 Src("Automatic (album art for music, screen for videos)", ColorSource.Auto),
