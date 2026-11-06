@@ -62,7 +62,6 @@ namespace Penumbra
             Brightness.ValueChanged += (_, e) => Set(() => _s.Brightness = e.NewValue);
             Waviness.ValueChanged += (_, e) => Set(() => _s.Waviness = e.NewValue);
             IdleGlow.Click += (_, _) => Set(() => _s.IdleGlow = IdleGlow.IsChecked == true);
-            EdgeLight.Click += (_, _) => Set(() => _s.EdgeLight = EdgeLight.IsChecked == true);
             HiddenVideoThumbnail.Click += (_, _) => Set(() => _s.HiddenVideoThumbnail = HiddenVideoThumbnail.IsChecked == true);
             ShowLyrics.Click += (_, _) => Set(() => _s.ShowLyrics = ShowLyrics.IsChecked == true);
             foreach (RadioButton r in LyricsChoices.Children)
@@ -144,7 +143,6 @@ namespace Penumbra
             PrimarySwatch.Background = new SolidColorBrush(GlowController.Parse(_s.Primary, Colors.MediumPurple));
             SecondarySwatch.Background = new SolidColorBrush(GlowController.Parse(_s.Secondary, Colors.HotPink));
             IdleGlow.IsChecked = _s.IdleGlow;
-            EdgeLight.IsChecked = _s.EdgeLight;
             HiddenVideoThumbnail.IsChecked = _s.HiddenVideoThumbnail;
             ShowLyrics.IsChecked = _s.ShowLyrics;
             foreach (RadioButton r in LyricsChoices.Children) r.IsChecked = (string)r.Tag == _s.LyricsStyle.ToString();
@@ -209,7 +207,6 @@ namespace Penumbra
                 : st?.source == "thumbnail" ? "From the video's thumbnail (video is hidden)"
                 : "Default colors";
             if (!_s.Enabled) from += " · glow is switched off";
-            else if (!_s.EdgeLight) from += " · edge light is off";
             else if (!sound && !_s.IdleGlow && _s.Mode == GlowMode.MusicSync) from += " · glow waits for sound";
             ColorInfo.Text = from;
 

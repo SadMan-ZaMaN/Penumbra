@@ -82,7 +82,6 @@ Then play something: Spotify, YouTube in a browser, or any app that shows up in 
 | **On/off** | The switch at the top of the panel. |
 | **Colors** | **Auto**: album art for music, the screen for videos. Or always **Album art**, always **Screen**, or **Mine**: pick two colors or click a preset. |
 | **Hidden video: use its thumbnail** | With Auto: when a video plays minimized or behind other windows, use its thumbnail's colors instead of what's on screen. |
-| **Edge light** | The light around the screen edges. **Off by default**: switch it on in the Look section. Lyrics and Night sky work with it off too, and with it off Penumbra draws nothing at all until there are lyrics to show. |
 | **Thickness / Glow / Brightness** | The width of the line, the size of its soft halo, and overall intensity. |
 | **Waviness** | How much the line's thickness ripples as the light flows. |
 | **Corners** | **Square** (light reaches right into the corners), **Rounded** or **Round**. Rounded corners paint the corners outside the curve black, so the screen itself looks rounded. |

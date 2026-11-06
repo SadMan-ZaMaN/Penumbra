@@ -28,7 +28,6 @@ namespace Penumbra
     public class Settings
     {
         public bool Enabled { get; set; } = true;
-        public bool EdgeLight { get; set; } = false;    // the light around the edges (lyrics and Night sky work without it)
         public GlowMode Mode { get; set; } = GlowMode.MusicSync;
         public double Thickness { get; set; } = 5;      // the solid line along the edge (px)
         public double Glow { get; set; } = 18;          // the soft halo just inside the line (px)

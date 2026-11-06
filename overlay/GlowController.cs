@@ -103,8 +103,6 @@ namespace Penumbra
                 _energy = 0.2;
             }
 
-            if (!_settings.EdgeLight) tOpacity = 0;   // switched off: it fades out; lyrics and Night sky carry on
-
             // ---- smoothing (frame-rate independent)
             static double Follow(double cur, double target, double up, double down, double dt)
             {
@@ -155,7 +153,7 @@ namespace Penumbra
             f.Opacity = _opacity;
             f.Rim = Math.Max(0.5, _rim);
             f.Halo = Math.Max(1, _halo);
-            f.Radius = _settings.EdgeLight ? _settings.CornerRadius : 0;   // the black rounded corners go with it
+            f.Radius = _settings.CornerRadius;
             f.Time = _waveT;
             f.Phase = _phase;
             f.Base = _base;

@@ -50,8 +50,7 @@ namespace Penumbra
         int _band;           // px: width of the edge strips drawn (all the light is inside them)
         int _clearFrames;    // frames that must wipe the whole buffer first (one per swap chain buffer)
         bool _fullPresent;   // this frame changed more than the edge strips
-        bool _strips = true; // the edge strips are being drawn (off while the edge light is off)
-        readonly RawRect[] _dirty = new RawRect[4], _dirtyWithLyrics = new RawRect[5], _dirtyLyricsOnly = new RawRect[1];
+        readonly RawRect[] _dirty = new RawRect[4], _dirtyWithLyrics = new RawRect[5];
         // Where the lyrics were drawn 1 and 2 frames ago. There are two buffers taking turns, so the one
         // about to be drawn still holds the lyrics from 2 frames ago; both get wiped before drawing.
         RawRect? _lyrics1, _lyrics2;
@@ -390,10 +389,6 @@ namespace Penumbra
             // When the strips change size (or the buffers are new) wipe each buffer once.
             int band = Band(c);
             if (band != _band) { _band = band; _clearFrames = 2; }
-            // Edge light off (and faded out): skip the edge strips entirely, so the GPU and the compositor
-            // only deal with the lyrics. Switching between the two wipes both buffers once.
-            bool strips = f.Opacity >= 0.002 || f.Radius > 0.5;
-            if (strips != _strips) { _strips = strips; _clearFrames = 2; }
             if (_black || _clearFrames > 0)
             {
                 ctx.ClearRenderTargetView(_rtv!, new Color4(0, 0, 0, _black ? 1 : 0));
@@ -412,8 +407,7 @@ namespace Penumbra
             ctx.VSSetConstantBuffer(0, _cb!);
             ctx.PSSetShader(_ps!);
             ctx.PSSetConstantBuffer(0, _cb!);
-            if (strips) ctx.Draw(30, 0);   // 4 strips + the lyrics wipe, 2 triangles each
-            else ctx.Draw(6, 24);          // just the lyrics wipe (the 5th quad)
+            ctx.Draw(30, 0);   // 4 strips + the lyrics wipe, 2 triangles each
 
             // lyrics on top of the glow
             RawRect? drawn = null;
@@ -449,16 +443,8 @@ namespace Penumbra
         void Present()
         {
             SharpGen.Runtime.Result hr;
-            int sw = Width, sh = Height;
-            if (_fullPresent || (!_strips && _lyricsDirty == null))   // (no strips and no lyrics: just once, when it goes idle)
+            if (_fullPresent)
                 hr = _swap!.Present(_sync, PresentFlags.None);
-            else if (!_strips)
-            {
-                // edge light off: only the lyrics changed
-                var area = _lyricsDirty!.Value;
-                _dirtyLyricsOnly[0] = new RawRect(Math.Max(0, area.Left), Math.Max(0, area.Top), Math.Min(sw, area.Right), Math.Min(sh, area.Bottom));
-                hr = _swap!.Present1(_sync, PresentFlags.None, new PresentParameters { DirtyRectangles = _dirtyLyricsOnly });
-            }
             else
             {
                 // tell the compositor only the edge strips changed, so it doesn't redo the whole screen
