@@ -268,8 +268,9 @@ DEMO_SONG = 200   # the demo "song" is its lines over and over, 200 of them (for
 
 
 def listen_for_buttons(port, media):
-    """The Now playing screen's buttons: {"cmd": "toggle" / "next" / "previous"} from the overlay, on
-    127.0.0.1 only (nothing outside this PC can reach it)."""
+    """The Now playing screen's buttons: {"cmd": "toggle" / "next" / "previous"}, or {"cmd": "seek",
+    "pos": seconds} from its progress bar, sent by the overlay to 127.0.0.1 only (nothing outside this
+    PC can reach it)."""
     def run():
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         try:
@@ -279,9 +280,12 @@ def listen_for_buttons(port, media):
         while True:
             try:
                 data, _ = sock.recvfrom(4096)
-                cmd = json.loads(data).get("cmd", "")
+                msg = json.loads(data)
+                cmd = msg.get("cmd", "")
                 if cmd in ("toggle", "next", "previous"):
                     media.command(cmd)
+                elif cmd == "seek" and isinstance(msg.get("pos"), (int, float)):
+                    media.command("seek", msg["pos"])
             except Exception:
                 pass
     threading.Thread(target=run, daemon=True).start()

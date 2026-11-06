@@ -115,12 +115,18 @@ class NowPlaying:
         if AVAILABLE:
             threading.Thread(target=self._run, daemon=True).start()
 
-    def command(self, cmd):
-        """'toggle' (play/pause), 'next' or 'previous' for the session being shown. Safe from any
-        thread: it's run on the polling thread's loop, and returns at once."""
+    def command(self, cmd, pos=None):
+        """'toggle' (play/pause), 'next', 'previous', or 'seek' to `pos` seconds, for the session being
+        shown. Safe from any thread: it's run on the polling thread's loop, and returns at once."""
         loop, session = self._aloop, self._session
         if loop is None or session is None:
             return
+        if cmd == "seek":
+            if pos is None:
+                return
+            pos = max(0.0, float(pos))
+            with self._lock:     # jump our own clock now, so the lyrics don't wait for the next poll
+                self._state.update(position=pos, stamp=time.monotonic())
 
         async def go():
             try:
@@ -130,6 +136,8 @@ class NowPlaying:
                     await session.try_skip_next_async()
                 elif cmd == "previous":
                     await session.try_skip_previous_async()
+                elif cmd == "seek":
+                    await session.try_change_playback_position_async(int(pos * 10_000_000))   # in 100 ns ticks
             except Exception:
                 pass
         asyncio.run_coroutine_threadsafe(go(), loop)

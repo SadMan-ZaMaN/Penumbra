@@ -62,6 +62,8 @@
                     <Ellipse x:Name="BarKnob" Canvas.Top="-0.5" Width="13" Height="13" Fill="White"/>
                     <TextBlock x:Name="Elapsed" Canvas.Top="19" FontSize="16" FontWeight="SemiBold" Opacity="0.63"/>
                     <TextBlock x:Name="Remaining" Canvas.Top="19" Width="360" TextAlignment="Right" FontSize="16" FontWeight="SemiBold" Opacity="0.63"/>
+                    <!-- click or drag here to jump within the song (taller than the bar, so it's easy to hit) -->
+                    <Border x:Name="BarHit" Canvas.Top="-6" Width="360" Height="24" Background="Transparent" Cursor="Hand"/>
                 </Canvas>
 
                 <!-- previous / play-pause / next -->

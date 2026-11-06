@@ -73,6 +73,18 @@ namespace Penumbra
             Next.Click += (_, _) => _link.Send("next");
             PlayPause.Click += (_, _) => TogglePlay();
 
+            // the progress bar: press, drag (the bar follows the mouse), let go to jump there
+            BarHit.MouseLeftButtonDown += (_, e) => { _dragging = true; BarHit.CaptureMouse(); DragTo(e.GetPosition(Progress).X); e.Handled = true; };
+            BarHit.MouseMove += (_, e) => { if (_dragging) DragTo(e.GetPosition(Progress).X); };
+            BarHit.MouseLeftButtonUp += (_, e) =>
+            {
+                if (!_dragging) return;
+                _dragging = false;
+                BarHit.ReleaseMouseCapture();
+                SeekToDragged();
+            };
+            BarHit.LostMouseCapture += (_, _) => _dragging = false;   // e.g. Alt+Tab mid-drag: just stop
+
             _tick = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
             _tick.Tick += (_, _) => Refresh();
             IsOpen = true;
@@ -119,11 +131,14 @@ namespace Penumbra
             // the progress bar and times (hidden when the length isn't known, e.g. a live stream)
             if (s != null && s.dur > 1)
             {
-                double f = Math.Clamp(s.pos / s.dur, 0, 1);
-                BarFill.Width = 360 * f;
-                System.Windows.Controls.Canvas.SetLeft(BarKnob, 360 * f - 6.5);
-                Elapsed.Text = Clock(s.pos);
-                Remaining.Text = "-" + Clock(s.dur - s.pos);
+                double pos = s.pos;
+                if (_dragging) pos = _dragFrac * s.dur;   // follows the mouse
+                else if (DateTime.UtcNow < _seekHeld)     // just jumped: hold the new spot until the player confirms it
+                {
+                    pos = _seekTo + (s.playing ? (DateTime.UtcNow - _seekAt).TotalSeconds : 0);
+                    if (Math.Abs(s.pos - pos) < 1.5) _seekHeld = DateTime.MinValue;
+                }
+                ShowBar(pos, s.dur);
                 Progress.Visibility = Visibility.Visible;
             }
             else Progress.Visibility = Visibility.Hidden;
@@ -155,6 +170,35 @@ namespace Penumbra
         {
             _playingShown = playing;
             PlayPause.Content = playing ? "" : "";   // pause : play
+        }
+
+        bool _dragging;
+        double _dragFrac, _seekTo;
+        DateTime _seekAt, _seekHeld;
+
+        void ShowBar(double pos, double dur)
+        {
+            double f = Math.Clamp(pos / dur, 0, 1);
+            BarFill.Width = 360 * f;
+            System.Windows.Controls.Canvas.SetLeft(BarKnob, 360 * f - 6.5);
+            Elapsed.Text = Clock(pos);
+            Remaining.Text = "-" + Clock(dur - pos);
+        }
+
+        void DragTo(double x)
+        {
+            _dragFrac = Math.Clamp(x / 360, 0, 1);
+            if (_glow.Last is { dur: > 1 } s) ShowBar(_dragFrac * s.dur, s.dur);
+        }
+
+        void SeekToDragged()
+        {
+            if (_glow.Last is not { dur: > 1 } s) return;
+            _seekTo = _dragFrac * s.dur;
+            _link.Send("seek", _seekTo);
+            _seekAt = DateTime.UtcNow;
+            _seekHeld = _seekAt.AddSeconds(2);
+            ShowBar(_seekTo, s.dur);
         }
 
         static string Clock(double seconds)

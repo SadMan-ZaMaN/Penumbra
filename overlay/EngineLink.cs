@@ -76,12 +76,16 @@ namespace Penumbra
 
         public bool Connected => Stopwatch.GetElapsedTime(Interlocked.Read(ref _lastTicks)).TotalSeconds < 2;
 
-        /// <summary>Ask the engine to "toggle" (play / pause), "next" or "previous" the song that's playing.</summary>
-        public void Send(string cmd)
+        /// <summary>Ask the engine to "toggle" (play / pause), "next", "previous", or "seek" to
+        /// <paramref name="pos"/> seconds, in the song that's playing.</summary>
+        public void Send(string cmd, double? pos = null)
         {
             try
             {
-                var data = System.Text.Encoding.UTF8.GetBytes($"{{\"cmd\":\"{cmd}\"}}");
+                string json = pos is double p
+                    ? $"{{\"cmd\":\"{cmd}\",\"pos\":{p.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture)}}}"
+                    : $"{{\"cmd\":\"{cmd}\"}}";
+                var data = System.Text.Encoding.UTF8.GetBytes(json);
                 _udp.Send(data, data.Length, _buttons);
             }
             catch { /* engine not running: nothing to do */ }
