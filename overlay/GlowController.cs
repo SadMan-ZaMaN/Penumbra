@@ -37,6 +37,7 @@ namespace Penumbra
         readonly GlowFrame _frame = new();
 
         public LightState? Last { get; private set; }
+        public EngineLink Link => _link;
         public Color Primary => _primary;       // what's on screen right now (for the panel)
         public Color Secondary => _secondary;
 

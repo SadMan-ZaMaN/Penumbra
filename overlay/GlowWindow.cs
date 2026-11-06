@@ -169,6 +169,11 @@ namespace Penumbra
                 if (_lyrics != null) _lyrics.Shift = new Vector2((float)_inset, (float)_inset);   // the lyrics drift too
                 var region = NowPlayingScreen.IsOpen ? NowPlayingScreen.LyricsArea(Width, Height)   // beside the cover
                                                      : LyricsRenderer.RegionFor(style, _work, _scale);
+                if (_lyrics != null)
+                {
+                    _lyrics.ListMode = NowPlayingScreen.IsOpen;   // Flow there: the whole song as a list
+                    _lyrics.Song = _ctl.Link.Lyrics;
+                }
                 _lyrics?.Update(_ctl.Last, _settings.ShowLyrics && _ctl.Last?.sound == true, style, region, dt, _scale);
                 if (_settings.Enabled != shown) { shown = _settings.Enabled; Native.Show(_hwnd, shown); }
                 if (!shown) { Thread.Sleep(100); continue; }
@@ -213,9 +218,11 @@ namespace Penumbra
         /// (or after Esc).</summary>
         void FollowNightSky(LyricsStyle style, double dt)
         {
-            // (the Now playing screen has its own background: no black over it)
-            double lyrics = !_black && style == LyricsStyle.NightSky && _settings.ShowLyrics && !NowPlayingScreen.IsOpen
-                            ? _lyrics?.SongVisibility ?? 0 : 0;
+            // The Now playing screen has its own background: no black over it. Instead it fades its own
+            // background to black, following the same rule.
+            double night = !_black && style == LyricsStyle.NightSky && _settings.ShowLyrics ? _lyrics?.SongVisibility ?? 0 : 0;
+            NowPlayingScreen.Night = (float)night;
+            double lyrics = NowPlayingScreen.IsOpen ? 0 : night;
             var song = _ctl.Last?.title ?? "";
             if (lyrics < 0.003 || song != _song) BlackLifted = false;   // Night sky is over, or a new song: black again
             _song = song;

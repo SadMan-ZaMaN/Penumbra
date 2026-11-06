@@ -103,6 +103,10 @@ Night sky blacks out the **whole display**, taskbar included, while a song with 
 ### Now playing screen
 
 A full-screen player: the song's cover and name on a blurred copy of the cover, with the lyrics beside it. Open it from the **Now playing screen** button at the top of the panel, or from the tray menu. **Esc** closes it, and Alt+Tab works as usual.
+- **Lyrics** (with **Show lyrics** on) sit beside the cover, in your chosen style:
+  - **Flow** becomes a scrolling list, like YouTube Music or Spotify: the line being sung fills in word by word, the one just sung sits dimmer above, the next ones wait below, and the list glides up line by line.
+  - **Constellation** draws its stars there.
+  - **Night sky** fades the blurred background to black, keeping the cover and the stars.
 - Windows only gets a small cover from browsers (120 px from YouTube Music), so while this screen is open, Penumbra looks up a sharp one (1000 px) with Apple's free iTunes search. It only uses a result by the same artist with the same title, and keeps the small cover if there's none.
 - Work in progress: the progress bar and play / pause / skip buttons come next.
 

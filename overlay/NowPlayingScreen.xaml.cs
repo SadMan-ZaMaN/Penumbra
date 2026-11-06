@@ -21,6 +21,11 @@ namespace Penumbra
         public static volatile bool IsOpen;
         static NowPlayingScreen? _open;
 
+        /// <summary>Night sky, 0..1 (set by the glow window): how far the blurred background has faded
+        /// to black. The cover card and the lyrics stay.</summary>
+        public static volatile float Night;
+        double _backdropTo = 1;
+
         // where the lyrics go, on the 1440 x 900 design canvas (see the XAML)
         const float CanvasW = 1440, CanvasH = 900;
         static readonly RawRectF LyricsBox = new(740, 100, 1240, 665);
@@ -102,6 +107,14 @@ namespace Penumbra
                 _artShown = art.Id;
                 var bmp = Decode(Convert.FromBase64String(art.Jpeg), 0);
                 if (bmp != null) ShowCover(bmp);
+            }
+
+            // Night sky: the blurred background fades to black (and back) over the window's black
+            double want = 1 - Night;
+            if (Math.Abs(want - _backdropTo) > 0.02 || ((want == 0 || want == 1) && want != _backdropTo))
+            {
+                _backdropTo = want;
+                Backdrop.BeginAnimation(OpacityProperty, new System.Windows.Media.Animation.DoubleAnimation(want, TimeSpan.FromSeconds(0.6)));
             }
         }
 

@@ -58,6 +58,7 @@ namespace Penumbra
             public double Leaving = -1;     // seconds since it started to leave (-1 = still current)
             public double SungAt;           // seconds into the line, as last reported
             public double SingFor = 1;      // estimated seconds to sing it
+            public int Rows = 1;            // Flow: how many rows its words take
         }
 
         const string Font = "Segoe UI Variable Display";
@@ -87,6 +88,23 @@ namespace Penumbra
         readonly List<(Word w, Vector2 star, float starR, float scale, float a, bool active)> _shown = new();
         double _alpha;                      // whole-lyrics fade in / out
         RawRectF _region;                   // where lyrics go, px (set every frame in Update)
+
+        // ---- the Now playing screen's Flow: the song as a list (like YouTube Music or Spotify), the line
+        // being sung word by word as usual, the others whole and dim. Those are drawn once each into a
+        // stencil (made in Update: Direct2D can't make one in the middle of drawing a frame).
+        /// <summary>Draw Flow as a list (the glow window sets this while the Now playing screen is open).</summary>
+        public bool ListMode { get; set; }
+        /// <summary>All the song's lines, from the engine (lidx indexes them).</summary>
+        public SongLyrics? Song { get; set; }
+        bool _list;                         // drawing the list right now (ListMode, and Flow)
+        readonly Dictionary<int, Stencil> _blocks = new();   // song lines, whole, wrapped to the region's width
+        int _blocksFor = int.MinValue;      // ...for this Song.Id
+        float _blocksWidth;                 // ...and this width
+        int _listIdx = int.MinValue;        // the line in the sung spot (being sung, or a break)
+        double _scroll;                     // px the list still has to glide up after a line change (eases to 0)
+        double _listAlpha;                  // the list's fade in / out
+        bool _drawingList;                  // DrawLine is drawing the sung line inside the list
+        float ListGap => _formatPx * 0.55f; // between lines in the list
 
         /// <summary>Pixels this renderer drew into last frame (null = nothing).</summary>
         public RawRect? Drawn { get; private set; }
@@ -134,7 +152,7 @@ namespace Penumbra
         }
 
         /// <summary>Is there anything to draw (or still fading)?</summary>
-        public bool Active => _alpha > 0.002 || _leaving.Count > 0;
+        public bool Active => _alpha > 0.002 || _leaving.Count > 0 || _listAlpha > 0.002;
 
         /// <summary>How visible the lyrics are right now, 0..1 (fades in and out).</summary>
         public double Visibility => _alpha;
@@ -162,7 +180,21 @@ namespace Penumbra
                 }
             }
 
+            bool list = ListMode && style == LyricsStyle.Flow;
+            if (list != _list)   // switching between the list and the usual layouts: start afresh
+            {
+                _list = list;
+                FreeBlocks();
+                _listIdx = int.MinValue;
+                _scroll = 0;
+                if (_current != null) { Free(_current); _current = null; }
+                foreach (var l in _leaving) Free(l);
+                _leaving.Clear();
+            }
+
             bool has = show && s != null && !string.IsNullOrWhiteSpace(s.lyric);
+            // the list keeps its line through a pause (the whole list fades instead)
+            bool hasLine = list ? s != null && !string.IsNullOrWhiteSpace(s.lyric) : has;
             _alpha += ((has ? 1 : 0) - _alpha) * (1 - Math.Exp(-(has ? 6 : 4) * dt));
             // reasons to stay: this song has lyrics or they're being looked up, or (for --demo, which has
             // no lookups) it's a break after the singing started with another line still to come
@@ -172,19 +204,25 @@ namespace Penumbra
             _night = has || _night && _lapse < 2.5;
             _songAlpha += ((_night ? 1 : 0) - _songAlpha) * (1 - Math.Exp(-(_night ? 6 : 4) * dt));
 
-            if (has && (_current == null || _current.Index != s!.lidx || _current.Text != s.lyric || _current.Style != style))
+            if (hasLine && (_current == null || _current.Index != s!.lidx || _current.Text != s.lyric || _current.Style != style))
             {
-                if (_current != null) { _current.Leaving = 0; _leaving.Add(_current); }
+                if (_current != null)
+                {
+                    if (list) Free(_current);   // it carries on as a dim line of the list
+                    else { _current.Leaving = 0; _leaving.Add(_current); }
+                }
                 _current = MakeLine(s!.lyric, s.lidx, style, scale);
-                SetNext(s.next, style, scale);
+                SetNext(list ? "" : s.next, style, scale);
                 _device?.ClearResources(0);   // the line's stencils are made: let Direct2D drop its scratch memory
             }
-            else if (!has && _current != null && _alpha < 0.01)
+            else if (!hasLine && _current != null && (list || _alpha < 0.01))
             {
-                _current.Leaving = 0;
-                _leaving.Add(_current);
+                if (list) Free(_current);
+                else { _current.Leaving = 0; _leaving.Add(_current); }
                 _current = null;
             }
+            if (list) UpdateList(s, show, scale, dt);
+            else _listAlpha = 0;
             if (_current != null && s != null)
             {
                 _current.Age += dt;
@@ -205,8 +243,10 @@ namespace Penumbra
         {
             // Flow: big, clean and bold. Constellation words are made at their biggest (the word
             // being sung) and shrink from there.
-            float px = (float)((style == LyricsStyle.Flow ? 34 : 44) * scale);
+            // (the Now playing screen's list: a little bigger, like the mockup)
+            float px = (float)((_list ? 37 : style == LyricsStyle.Flow ? 34 : 44) * scale);
             if (_format != null && Math.Abs(px - _formatPx) < 0.5f && style == _formatStyle) return;
+            FreeBlocks();   // they're made in this font
             _format?.Dispose(); _settledFormat?.Dispose(); _small?.Dispose();
             _format = MakeFormat(px, style == LyricsStyle.Flow ? FontWeight.Bold : FontWeight.SemiBold);
             _settledFormat = MakeFormat(px * Settled, FontWeight.SemiBold);
@@ -244,9 +284,9 @@ namespace Penumbra
 
         /// <summary>The text in white on transparent, <paramref name="pad"/> px in from each side.
         /// Stored as alpha only (1 byte a pixel instead of 4) unless this GPU can't draw text that way.</summary>
-        Stencil MakeTextStencil(string text, IDWriteTextFormat format, float pad, out float w, out float h)
+        Stencil MakeTextStencil(string text, IDWriteTextFormat format, float pad, out float w, out float h, float maxWidth = 4000)
         {
-            using var layout = _dw.CreateTextLayout(text, format, 4000, 1000);
+            using var layout = _dw.CreateTextLayout(text, format, maxWidth, 2000);   // wraps if wider than maxWidth
             var m = layout.Metrics;
             float tw = w = m.WidthIncludingTrailingWhitespace, th = h = m.Height;
             void Text(ID2D1DeviceContext ctx) => ctx.DrawTextLayout(new Vector2(pad, pad), layout, _brush!);
@@ -326,10 +366,11 @@ namespace Penumbra
             return _dot;
         }
 
-        /// <summary>Flow: words in centred rows; the block sits above the small "next line".</summary>
+        /// <summary>Flow: words in centred rows; the block sits above the small "next line".
+        /// In the list: rows from the left edge, as wide as the region (its top is set when drawn).</summary>
         void LayoutFlow(Line line)
         {
-            float maxW = (_region.Right - _region.Left) * 0.94f, space = _formatPx * 0.28f, rowH = _formatPx * 1.3f;
+            float maxW = (_region.Right - _region.Left) * (_list ? 1 : 0.94f), space = _formatPx * 0.28f, rowH = _formatPx * 1.3f;
             var rows = new List<(int from, int to, float width)>();
             int start = 0; float x = 0;
             for (int i = 0; i < line.Words.Count; i++)
@@ -340,9 +381,10 @@ namespace Penumbra
             }
             rows.Add((start, line.Words.Count, x - space));
             float regionW = _region.Right - _region.Left;
+            line.Rows = rows.Count;
             for (int r = 0; r < rows.Count; r++)
             {
-                float cx = (regionW - rows[r].width) / 2;
+                float cx = _list ? 0 : (regionW - rows[r].width) / 2;
                 for (int i = rows[r].from; i < rows[r].to; i++)
                 {
                     line.Words[i].Pos = new Vector2(cx, r * rowH);
@@ -400,6 +442,59 @@ namespace Penumbra
             Math.Max(0, Math.Min(a.Right, b.Right) - Math.Max(a.Left, b.Left)) *
             Math.Max(0, Math.Min(a.Bottom, b.Bottom) - Math.Max(a.Top, b.Top));
 
+        /// <summary>The list: which line is in the sung spot, the glide after a line change, the fade,
+        /// and the stencils for the lines around it (made here, before drawing).</summary>
+        void UpdateList(LightState? s, bool show, double scale, double dt)
+        {
+            EnsureFormats(LyricsStyle.Flow, scale);
+            var song = Song != null && s != null && Song.Id == s.lyr_id ? Song : null;   // not an old song's lines
+            bool on = show && song != null && song.Lines.Length > 0;
+            _listAlpha += ((on ? 1 : 0) - _listAlpha) * (1 - Math.Exp(-(on ? 6 : 4) * dt));
+            if (song == null) return;
+
+            int idx = s!.lidx;
+            if (idx != _listIdx)
+            {
+                // simply the next line: glide up by the one just sung; anything else (a seek, a new song): jump
+                _scroll = idx == _listIdx + 1 && _listIdx >= 0 ? BlockHeight(_listIdx) + ListGap : 0;
+                _listIdx = idx;
+                foreach (var k in new List<int>(_blocks.Keys))
+                    if (k < idx - 3 || k > idx + 14) { _blocks[k].Dispose(); _blocks.Remove(k); }
+            }
+            _scroll *= Math.Exp(-7 * dt);
+            for (int k = -2; k <= 10; k++) Block(_listIdx + k);   // the lines that can show, made if they aren't yet
+        }
+
+        /// <summary>The list: line <paramref name="i"/> of the song, whole, wrapped to the region's width
+        /// (a break shows as ♪). Made on first use, so only call it outside Draw.</summary>
+        Stencil? Block(int i)
+        {
+            var song = Song;
+            if (song == null || i < 0 || i >= song.Lines.Length) return null;
+            float width = _region.Right - _region.Left;
+            if (song.Id != _blocksFor || Math.Abs(width - _blocksWidth) > 0.5f)
+            {
+                FreeBlocks();
+                _blocksFor = song.Id;
+                _blocksWidth = width;
+            }
+            if (_blocks.TryGetValue(i, out var b)) return b;
+            string text = string.IsNullOrWhiteSpace(song.Lines[i]) ? "♪" : song.Lines[i];
+            return _blocks[i] = MakeTextStencil(text, _format!, 2, out _, out _, width);
+        }
+
+        /// <summary>A line's stencil if it's already made (for Draw, which can't make one).</summary>
+        Stencil? Made(int i) => _blocks.TryGetValue(i, out var b) ? b : null;
+
+        float BlockHeight(int i) => Block(i) is Stencil b ? b.H - b.Pad * 2 : 0;
+
+        void FreeBlocks()
+        {
+            foreach (var b in _blocks.Values) b.Dispose();
+            _blocks.Clear();
+            _blocksFor = int.MinValue;
+        }
+
         void SetNext(string next, LyricsStyle style, double scale)
         {
             _next?.Dispose();
@@ -445,13 +540,14 @@ namespace Penumbra
             ctx.BeginDraw();
             ctx.AntialiasMode = AntialiasMode.Aliased;   // stencils need it; switched only around the few vector shapes
             _x0 = _y0 = float.MaxValue; _x1 = _y1 = float.MinValue;
+            if (_list) DrawList(ctx, sung, glow, scale, origin);
             // glows first, then everything crisp on top, so a glow never covers a neighbouring word
-            for (int pass = 0; pass < 2; pass++)
+            else for (int pass = 0; pass < 2; pass++)
             {
                 foreach (var l in _leaving) DrawLine(ctx, l, pass == 0, sung, glow, scale, origin);
                 if (_current != null) DrawLine(ctx, _current, pass == 0, sung, glow, scale, origin);
             }
-            if (_next != null && _current != null && _current.Style == LyricsStyle.Flow)
+            if (!_list && _next != null && _current != null && _current.Style == LyricsStyle.Flow)
             {
                 float rw = _region.Right - _region.Left, rh = _region.Bottom - _region.Top;
                 Paint(ctx, _next, Matrix3x2.CreateTranslation((rw - _nextW) / 2, rh - _nextH - _formatPx * 0.05f) * origin,
@@ -464,6 +560,55 @@ namespace Penumbra
             // only where something was actually drawn gets wiped and redrawn next frame
             Drawn = _x1 < _x0 ? null : new RawRect((int)Math.Floor(_x0) - 2, (int)Math.Floor(_y0) - 2,
                                                    (int)Math.Ceiling(_x1) + 2, (int)Math.Ceiling(_y1) + 2);
+        }
+
+        /// <summary>The list: the line being sung about a fifth of the way down (word by word, as in Flow),
+        /// the two before it dimmer above, the ones to come below, fading out towards the bottom.</summary>
+        void DrawList(ID2D1DeviceContext ctx, Color4 sung, Color4 glow, double scale, Matrix3x2 origin)
+        {
+            float a = (float)_listAlpha;
+            if (a <= 0.004f) return;
+            float rh = _region.Bottom - _region.Top, gap = ListGap, rowH = _formatPx * 1.3f;
+            float y = rh * 0.22f + (float)_scroll;
+            ctx.Transform = Matrix3x2.Identity;
+            ctx.PushAxisAlignedClip(new RawRectF(_region.Left + Shift.X, _region.Top + Shift.Y,
+                                                 _region.Right + Shift.X, _region.Bottom + Shift.Y), AntialiasMode.Aliased);
+            float Height(Stencil b) => b.H - b.Pad * 2;
+
+            // the line being sung (glows first, then the text), or a break's ♪
+            float h0 = 0;
+            if (_current != null && _current.Index == _listIdx)
+            {
+                _current.BlockTop = y;
+                _drawingList = true;
+                DrawLine(ctx, _current, true, sung, glow, scale, origin);
+                DrawLine(ctx, _current, false, sung, glow, scale, origin);
+                _drawingList = false;
+                h0 = _current.Rows * rowH;
+            }
+            else if (Made(_listIdx) is Stencil b0)
+            {
+                Paint(ctx, b0, Matrix3x2.CreateTranslation(0, y) * origin, new Color4(1, 1, 1, 0.5f * a));
+                h0 = Height(b0);
+            }
+
+            float up = y;   // the lines just sung
+            for (int k = 1; k <= 2 && Made(_listIdx - k) is Stencil b; k++)
+            {
+                up -= gap + Height(b);
+                Paint(ctx, b, Matrix3x2.CreateTranslation(0, up) * origin, new Color4(1, 1, 1, (k == 1 ? 0.3f : 0.15f) * a));
+            }
+            float down = y + h0;   // the lines to come, fading out by the bottom of the area (gone as they touch it)
+            for (int k = 1; down < rh && Made(_listIdx + k) is Stencil b; k++)
+            {
+                down += gap;
+                float fade = (float)Smooth((rh - down - Height(b)) / (rh * 0.3));
+                Paint(ctx, b, Matrix3x2.CreateTranslation(0, down) * origin,
+                      new Color4(1, 1, 1, Math.Max(0.14f, 0.42f - 0.07f * (k - 1)) * fade * a));
+                down += Height(b);
+            }
+            ctx.Transform = Matrix3x2.Identity;
+            ctx.PopAxisAlignedClip();
         }
 
         /// <summary>Note that <paramref name="r"/> (in the coordinates of <paramref name="t"/>) is being drawn.</summary>
@@ -514,8 +659,9 @@ namespace Penumbra
                 float rowH = _formatPx * 1.3f;
                 bool leaving = l.Leaving >= 0;
                 double inT = Ease(l.Age / 0.45), outT = leaving ? Ease(l.Leaving / 0.5) : 0;
-                float dy = (float)((1 - inT) * rowH * 0.6 - outT * rowH * 0.8);
-                float lineAlpha = (float)(Ease(l.Age / 0.35) * _alpha);
+                // (in the list it doesn't slide or fade in: it was already there, dim, and the list glides)
+                float dy = _drawingList ? 0 : (float)((1 - inT) * rowH * 0.6 - outT * rowH * 0.8);
+                float lineAlpha = _drawingList ? (float)_listAlpha : (float)(Ease(l.Age / 0.35) * _alpha);
 
                 // where the singing is: a soft-edged sweep at (row, x) that crosses word gaps smoothly
                 int wipeRow = int.MaxValue; float wipeX = 0;
@@ -647,6 +793,7 @@ namespace Penumbra
             foreach (var l in _leaving) Free(l);
             _leaving.Clear();
             _next?.Dispose(); _next = null;
+            FreeBlocks();
             _dot?.Dispose(); _dot = null;
             _wipe?.Dispose(); _wipe = null;
             _glowWipe?.Dispose(); _glowWipe = null;

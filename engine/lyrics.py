@@ -94,6 +94,14 @@ class Lyrics:
         self._busy = False
         self._tries = 0
         self._last_try = 0.0
+        self._id = 0          # changes whenever the lines do (a new song, or its lyrics arriving)
+
+    @property
+    def texts(self):
+        """(id, every line's text) for the current song, for the Now playing screen's lyrics list.
+        Empty lines (instrumental breaks) are kept, so the positions match the line index."""
+        with self._lock:
+            return self._id, [t for _, t in self._lines]
 
     @property
     def status(self):
@@ -118,6 +126,7 @@ class Lyrics:
                     return
             else:
                 self._key, self._lines, self._times, self._rate, self._tries = key, [], [], DEFAULT_RATE, 0
+                self._id += 1
                 if not title:
                     return
             self._busy, self._tries, self._last_try = True, self._tries + 1, now
@@ -126,6 +135,7 @@ class Lyrics:
             lines = fetch(artist, title, album, duration)
             with self._lock:
                 if self._key == key:
+                    self._id += 1
                     self._lines = lines
                     self._times = [t for t, _ in lines]
                     self._rate = singing_rate(lines)

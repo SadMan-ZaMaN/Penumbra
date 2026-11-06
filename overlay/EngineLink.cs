@@ -35,10 +35,15 @@ namespace Penumbra
         public string lstat { get; set; } = "";   // lyrics for this song: found / searching / none / private
         public int art_id { get; set; } = -1;   // which cover the song has (changes with the song / when its art arrives)
         public string art { get; set; } = "";    // that cover as a base64 JPEG, in about one packet a second
+        public int lyr_id { get; set; } = -1;    // which lyrics the song has (changes with the song / when they arrive)
+        public List<string>? lines { get; set; } // all of them (lidx indexes these), in about one packet a second
     }
 
     /// <summary>A cover from the engine: its id and JPEG bytes (base64).</summary>
     public sealed record CoverArt(int Id, string Jpeg);
+
+    /// <summary>All of a song's lyric lines, for the Now playing screen's list.</summary>
+    public sealed record SongLyrics(int Id, string[] Lines);
 
     /// <summary>Receives engine packets on UDP 127.0.0.1:port on a background thread.</summary>
     public class EngineLink : IDisposable
@@ -71,6 +76,10 @@ namespace Penumbra
         public CoverArt? Art => _art;
         volatile CoverArt? _art;
 
+        /// <summary>The last full set of lyric lines the engine sent (kept apart for the same reason).</summary>
+        public SongLyrics? Lyrics => _lyrics;
+        volatile SongLyrics? _lyrics;
+
         void Loop()
         {
             var any = new IPEndPoint(IPAddress.Any, 0);
@@ -85,6 +94,13 @@ namespace Penumbra
                     {
                         if (_art?.Id != s.art_id) _art = new CoverArt(s.art_id, s.art);
                         s.art = "";   // the frame-by-frame state doesn't need to carry it around
+                    }
+                    if (s.lines != null)
+                    {
+                        var old = _lyrics;
+                        if (old == null || old.Id != s.lyr_id || old.Lines.Length != s.lines.Count)
+                            _lyrics = new SongLyrics(s.lyr_id, s.lines.ToArray());
+                        s.lines = null;
                     }
                     if (s.beat) Interlocked.Increment(ref _beats);
                     _latest = s;

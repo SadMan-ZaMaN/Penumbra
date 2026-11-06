@@ -9,7 +9,8 @@ Sends ~60 JSON packets/s over UDP to 127.0.0.1:47800, e.g.
      "colors":["#7c5cff","#ff4fa3"],"source":"art","kind":"music","sound":true,"playing":true,
      "title":"...","artist":"...","lyric":"current line","next":"next line","lprog":0.4,
      "lidx":12,"lt":1.3,"ld":2.6,   (line index, seconds into the line, est. seconds to sing it)
-     "art_id":7, "art":"<base64 JPEG>"}   (the cover, for the Now playing screen; "art" about once a second)
+     "art_id":7, "art":"<base64 JPEG>",   (the cover, for the Now playing screen; "art" about once a second)
+     "lyr_id":3, "lines":["...", ...]}   (all the song's lines, for its lyrics list; "lines" about once a second)
 """
 import argparse
 import base64
@@ -260,7 +261,10 @@ def demo_lyrics(now, every=3.6):
     i = int(now // every)
     cur, nxt = DEMO_LINES[i % len(DEMO_LINES)], DEMO_LINES[(i + 1) % len(DEMO_LINES)]
     lt = now - i * every
-    return cur, nxt, lt / every, i, lt, sung_duration(cur, every)
+    return cur, nxt, lt / every, i % DEMO_SONG, lt, sung_duration(cur, every)
+
+
+DEMO_SONG = 200   # the demo "song" is its lines over and over, 200 of them (for the lyrics list)
 
 
 def watch_parent(pid):
@@ -312,6 +316,7 @@ def main():
     source = "default"
     art_id = -1
     art_b64, art_sent = "", 0.0      # the cover for the overlay, and when it was last sent
+    lines_sent = 0.0                 # ...and the same for the song's lines
 
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     addr = ("127.0.0.1", args.port)
@@ -394,6 +399,13 @@ def main():
             if art_b64 and now - art_sent > 1.0:   # the cover itself, about once a second (UDP can drop one)
                 pkt["art"] = art_b64
                 art_sent = now
+            lyr_id, texts = lyrics.texts
+            if args.demo and not np_state["title"]:   # the demo's made-up lines, as many as it has sung so far
+                lyr_id, texts = -2, [DEMO_LINES[k % len(DEMO_LINES)] for k in range(DEMO_SONG)]
+            pkt["lyr_id"] = lyr_id
+            if texts and now - lines_sent > 1.0 and now - art_sent > 0.3:   # not in the same packet as the cover
+                pkt["lines"] = texts
+                lines_sent = now
             sock.sendto(json.dumps(pkt, ensure_ascii=False).encode("utf-8"), addr)
 
             if args.debug and now - last_dbg > 0.1:
