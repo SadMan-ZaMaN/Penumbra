@@ -462,8 +462,19 @@ namespace Penumbra
                     if (k < idx - 3 || k > idx + 14) { _blocks[k].Dispose(); _blocks.Remove(k); }
             }
             _scroll *= Math.Exp(-7 * dt);
-            for (int k = -2; k <= 10; k++) Block(_listIdx + k);   // the lines that can show, made if they aren't yet
+            // the lines that can show, made if they aren't yet: nearest first, and only a few per frame, so
+            // opening the list (or a new song) doesn't hold up a frame of the glow
+            int made = 0;
+            foreach (int k in NearFirst)
+            {
+                int i = _listIdx + k;
+                if (i < 0 || i >= song.Lines.Length || _blocks.ContainsKey(i)) continue;
+                Block(i);
+                if (++made == 3) break;
+            }
         }
+
+        static readonly int[] NearFirst = { 0, 1, -1, 2, 3, -2, 4, 5, 6, 7, 8, 9, 10 };
 
         /// <summary>The list: line <paramref name="i"/> of the song, whole, wrapped to the region's width
         /// (a break shows as ♪). Made on first use, so only call it outside Draw.</summary>

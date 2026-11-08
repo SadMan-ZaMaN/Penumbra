@@ -30,8 +30,8 @@
             </Setter>
         </Style>
     </Window.Resources>
-    <!-- the whole screen fades in when it opens and out when it closes -->
-    <Grid x:Name="Root" Opacity="0">
+    <!-- (it fades in and out as a whole window, done by Windows' compositor: see FadeWindow) -->
+    <Grid x:Name="Root">
         <!-- the cover, blurred and darkened, filling the screen. Two layers, so a new song's can fade in over
              the last one's; the layer as a whole fades to black for Night sky. -->
         <Grid x:Name="BackdropLayer">

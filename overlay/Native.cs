@@ -244,6 +244,34 @@ namespace Penumbra
 
         public static void Show(IntPtr hwnd, bool show) => ShowWindow(hwnd, show ? 4 /* SW_SHOWNOACTIVATE */ : 0);
 
+        [DllImport("dwmapi.dll")] static extern int DwmFlush();
+
+        /// <summary>Let Windows' compositor fade a whole window (0 = invisible, 255 = solid), on the GPU, without
+        /// the window drawing anything again. Call once before <see cref="SetWindowAlpha"/>.</summary>
+        public static void MakeFadeable(IntPtr hwnd)
+        {
+            long ex = GetWindowLongPtr(hwnd, GWL_EXSTYLE).ToInt64();
+            SetWindowLongPtr(hwnd, GWL_EXSTYLE, new IntPtr(ex | WS_EX_LAYERED));
+        }
+
+        public static void SetWindowAlpha(IntPtr hwnd, byte alpha) => SetLayeredWindowAttributes(hwnd, 0, alpha, 2 /* LWA_ALPHA */);
+
+        /// <summary>Hide a window from the screen without hiding it from itself ("cloaked"): it still draws, the
+        /// compositor just doesn't show it. Lets a window draw its first frame out of sight.</summary>
+        public static void Cloak(IntPtr hwnd, bool cloak)
+        {
+            int on = cloak ? 1 : 0;
+            DwmSetWindowAttribute(hwnd, 13 /* DWMWA_CLOAK */, ref on, sizeof(int));
+        }
+
+        /// <summary>Wait for the compositor's next frame (one step of a fade per screen refresh).</summary>
+        public static void WaitForFrame()
+        {
+            long t = System.Diagnostics.Stopwatch.GetTimestamp();
+            DwmFlush();
+            if (System.Diagnostics.Stopwatch.GetElapsedTime(t).TotalMilliseconds < 2) System.Threading.Thread.Sleep(4);   // nothing to wait for
+        }
+
         /// <summary>Make the whole glow window see-through (0) or normal (255). Works from any thread,
         /// even if the window's own thread is stuck, which is what the Night sky safety net needs.</summary>
         public static void SetGlowOpacity(IntPtr hwnd, byte alpha) => SetLayeredWindowAttributes(hwnd, 0, alpha, 2 /* LWA_ALPHA */);

@@ -81,7 +81,30 @@ namespace Penumbra
             };
             SettingsButton.Click += (_, _) => ShowPanel?.Invoke();
             CloseButton.Click += (_, _) => FadeAndClose();
-            Loaded += (_, _) => Fade(Root, 0, 1, 0.35);
+            // Opening: hidden ("cloaked") while it draws its first frame, with everything already in place; then
+            // Windows' compositor fades the finished picture in (smooth, and nothing is drawn again). WPF
+            // clears the "layered" style a fade needs when it shows a window, so that's set only after.
+            SourceInitialized += (_, _) =>
+            {
+                _hwnd = new WindowInteropHelper(this).Handle;
+                Native.Cloak(_hwnd, true);
+                HwndSource.FromHwnd(_hwnd)?.AddHook(KeepFadeable);
+            };
+            ContentRendered += (_, _) =>
+            {
+                _fadeable = true;
+                Native.MakeFadeable(_hwnd);
+                Native.SetWindowAlpha(_hwnd, 0);
+                var later = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(40) };   // its repaint as a layered window
+                later.Tick += (_, _) =>
+                {
+                    later.Stop();
+                    Native.Cloak(_hwnd, false);
+                    _revealed = true;
+                    FadeWindow(true, 0.25);
+                };
+                later.Start();
+            };
             // the cursor hides after a few seconds without moving, like a video player
             MouseMove += (_, e) =>
             {
@@ -195,14 +218,54 @@ namespace Penumbra
         Point _mouseAt;
         bool _closing;
 
+        IntPtr _hwnd;
+        bool _revealed;      // the fade-in has started: from now on changes are animated
+
+        /// <summary>WPF strips the "layered" style (which the compositor fade needs) from windows that aren't
+        /// its own transparent kind, the moment it's set. This sees the style change first and keeps it.</summary>
+        IntPtr KeepFadeable(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+        {
+            const int WM_STYLECHANGING = 0x007C, GWL_EXSTYLE = -20, WS_EX_LAYERED = 0x80000;
+            if (msg == WM_STYLECHANGING && wParam.ToInt64() == GWL_EXSTYLE && _fadeable)
+            {
+                int styleNew = System.Runtime.InteropServices.Marshal.ReadInt32(lParam, 4);   // STYLESTRUCT.styleNew
+                System.Runtime.InteropServices.Marshal.WriteInt32(lParam, 4, styleNew | WS_EX_LAYERED);
+                handled = true;
+            }
+            return IntPtr.Zero;
+        }
+        bool _fadeable;
+        int _fadeId;         // the latest fade (a newer one stops an older one)
+
         /// <summary>Fade out, then close.</summary>
         void FadeAndClose()
         {
             if (_closing) return;
             _closing = true;
-            var a = new DoubleAnimation(0, TimeSpan.FromSeconds(0.25));
-            a.Completed += (_, _) => Close();
-            Root.BeginAnimation(OpacityProperty, a);
+            FadeWindow(false, 0.2, Close);
+        }
+
+        /// <summary>Fade the whole window in or out with the compositor: a background thread sets the window's
+        /// transparency once per screen refresh. The picture itself isn't drawn again, so it costs almost
+        /// nothing, and it can't stutter when the UI thread is busy.</summary>
+        void FadeWindow(bool show, double seconds, Action? done = null)
+        {
+            var hwnd = _hwnd;
+            int id = ++_fadeId;
+            Native.MakeFadeable(hwnd);   // (in case WPF cleared it since)
+            new Thread(() =>
+            {
+                var clock = System.Diagnostics.Stopwatch.StartNew();
+                while (id == _fadeId)
+                {
+                    double t = Math.Min(1, clock.Elapsed.TotalSeconds / seconds);
+                    double eased = 1 - Math.Pow(1 - t, 3);   // quick start, gentle finish
+                    Native.SetWindowAlpha(hwnd, (byte)Math.Round(255 * (show ? eased : 1 - eased)));
+                    if (t >= 1) break;
+                    Native.WaitForFrame();
+                }
+                if (id == _fadeId && done != null) Dispatcher.BeginInvoke(done);
+            }) { IsBackground = true, Name = "NowPlayingFade" }.Start();
         }
 
         static void Fade(UIElement e, double from, double to, double seconds) =>
@@ -270,7 +333,7 @@ namespace Penumbra
             var bmp = Decode(jpeg, 720);             // the cover is about 680 px on a 200% screen
             if (bmp == null) return;
             _sharp = true;
-            ShowCover(bmp);
+            ShowCover(bmp, sharper: _coverFor == _key);   // this song's small cover is up: just sharpen it
         }
 
         static readonly Brush Placeholder = MakePlaceholder();
@@ -283,23 +346,31 @@ namespace Penumbra
         }
 
         /// <summary>Show a cover (null: the placeholder) and the blurred background made from it, each
-        /// fading in over the last one.</summary>
-        void ShowCover(BitmapSource? bmp)
+        /// fading in over the last one. Before the screen appears, just put them in place (no animation).
+        /// <paramref name="sharper"/>: the same song's cover, only sharper: the blurred background would look
+        /// the same, so it's left alone (fading the whole screen is the expensive part).</summary>
+        void ShowCover(BitmapSource? bmp, bool sharper = false)
         {
             _coverFor = _key;
             var brush = bmp != null ? new ImageBrush(bmp) { Stretch = Stretch.UniformToFill } : Placeholder;
             if (ReferenceEquals(brush, CoverBox.Background)) return;   // the placeholder again: nothing changes
-            CoverOld.Background = CoverBox.Background;
+            CoverOld.Background = _revealed ? CoverBox.Background : null;
             CoverBox.Background = brush;
-            Fade(CoverBox, 0, 1, 0.5);
-            CoverNote.BeginAnimation(OpacityProperty, new DoubleAnimation(bmp != null ? 0 : 0.55, TimeSpan.FromSeconds(0.5)));
+            if (_revealed)
+            {
+                Fade(CoverBox, 0, 1, 0.4);
+                CoverNote.BeginAnimation(OpacityProperty, new DoubleAnimation(bmp != null ? 0 : 0.55, TimeSpan.FromSeconds(0.4)));
+            }
+            else CoverNote.Opacity = bmp != null ? 0 : 0.55;
+            if (sharper && Backdrop.Source != null) return;
 
             BackdropOld.BeginAnimation(OpacityProperty, null);
             BackdropOld.Opacity = 1;
-            BackdropOld.Source = Backdrop.Source;
+            BackdropOld.Source = _revealed ? Backdrop.Source : null;
             Backdrop.Source = bmp != null ? MakeBackdrop(bmp) : null;
-            if (Backdrop.Source != null) Fade(Backdrop, 0, 1, 0.8);   // the new one over the old
-            else Fade(BackdropOld, 1, 0, 0.8);                        // none: the old one fades to black
+            if (!_revealed) return;
+            if (Backdrop.Source != null) Fade(Backdrop, 0, 1, 0.6);   // the new one over the old
+            else Fade(BackdropOld, 1, 0, 0.6);                        // none: the old one fades to black
         }
 
         static BitmapSource? Decode(byte[] bytes, int width)
