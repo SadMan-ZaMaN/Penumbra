@@ -52,16 +52,37 @@ def _get(path, params):
         return json.loads(r.read().decode("utf-8"))
 
 
+def _same_length(d, duration):
+    # a different length usually means a different version (intro, radio edit): timing would be off
+    return not duration or not d.get("duration") or abs(d["duration"] - duration) <= 6
+
+
+def _same_artist(d, artist):
+    # loosely: a name in common ("Murtaza Qizilbash & Samar Jafri" vs "Samar Jafri, Murtaza Qizilbash")
+    ours = {w for w in re.findall(r"\w+", artist.lower()) if len(w) > 2}
+    return not ours or bool(ours & set(re.findall(r"\w+", (d.get("artistName") or "").lower())))
+
+
 def fetch(artist, title, album="", duration=None):
-    """Return parsed synced lyrics or [] (never raises). Tries the exact track first, then searches
-    with the title as given, then without any bracketed extras, then title + artist as free text."""
+    """(parsed synced lyrics or [], plain untimed lyrics or ""); never raises. Tries the exact track
+    first, then searches with the title as given, then without any bracketed extras, then title +
+    artist as free text. The plain text is kept for songs LRCLIB only has without timing."""
     artist = _artist(artist)
+    plain = ""
+
+    def keep_plain(d):
+        nonlocal plain
+        if (not plain and d.get("plainLyrics") and not d.get("instrumental")
+                and _same_length(d, duration) and _same_artist(d, artist)):
+            plain = d["plainLyrics"]
+
     if duration:
         try:
             d = _get("get", {"artist_name": artist, "track_name": _clean(title),
                              "album_name": album, "duration": int(round(duration))})
             if d.get("syncedLyrics"):
-                return parse_lrc(d["syncedLyrics"])
+                return parse_lrc(d["syncedLyrics"]), ""
+            keep_plain(d)
         except Exception:
             pass
     searches = [{"artist_name": artist, "track_name": t} for t in dict.fromkeys([_clean(title), _bare(title)])]
@@ -69,14 +90,12 @@ def fetch(artist, title, album="", duration=None):
     for params in searches:
         try:
             for d in _get("search", params):
-                if d.get("syncedLyrics"):
-                    # a different length usually means a different version (intro, radio edit): timing would be off
-                    if duration and d.get("duration") and abs(d["duration"] - duration) > 6:
-                        continue
-                    return parse_lrc(d["syncedLyrics"])
+                if d.get("syncedLyrics") and _same_length(d, duration):
+                    return parse_lrc(d["syncedLyrics"]), ""
+                keep_plain(d)
         except Exception:
             pass
-    return []
+    return [], plain
 
 
 class Lyrics:
@@ -95,6 +114,7 @@ class Lyrics:
         self._tries = 0
         self._last_try = 0.0
         self._id = 0          # changes whenever the lines do (a new song, or its lyrics arriving)
+        self._plain = ""      # the song's lyrics without timing, if that's all LRCLIB has
 
     @property
     def texts(self):
@@ -105,14 +125,17 @@ class Lyrics:
 
     @property
     def status(self):
-        """'' (no track), 'searching', 'found' or 'none' (nothing on LRCLIB, as far as we can tell)."""
+        """'' (no track), 'searching', 'found', 'plain' (only without timing, so it can't be synced) or
+        'none' (nothing on LRCLIB, as far as we can tell)."""
         with self._lock:
             if not self._key or not self._key[1]:
                 return ""
             if self._lines:
                 return "found"
             # only the first look counts as searching; the quiet retries after it don't flip it back
-            return "searching" if self._tries == 0 or (self._busy and self._tries == 1) else "none"
+            if self._tries == 0 or (self._busy and self._tries == 1):
+                return "searching"
+            return "plain" if self._plain else "none"
 
     def set_track(self, artist, title, album="", duration=None):
         """Call often (every frame is fine): looks lyrics up when the track changes, and again a few
@@ -126,17 +149,19 @@ class Lyrics:
                     return
             else:
                 self._key, self._lines, self._times, self._rate, self._tries = key, [], [], DEFAULT_RATE, 0
+                self._plain = ""
                 self._id += 1
                 if not title:
                     return
             self._busy, self._tries, self._last_try = True, self._tries + 1, now
 
         def work():
-            lines = fetch(artist, title, album, duration)
+            lines, plain = fetch(artist, title, album, duration)
             with self._lock:
                 if self._key == key:
                     self._id += 1
                     self._lines = lines
+                    self._plain = plain or self._plain   # (a later retry that finds nothing keeps what was found)
                     self._times = [t for t, _ in lines]
                     self._rate = singing_rate(lines)
                     self._last_try = time.monotonic()

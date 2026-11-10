@@ -32,7 +32,7 @@ namespace Penumbra
         public int lidx { get; set; } = -1;   // which lyric line (a repeated chorus line still counts as new)
         public double lt { get; set; }         // seconds into the line
         public double ld { get; set; }         // estimated seconds it takes to sing the line
-        public string lstat { get; set; } = "";   // lyrics for this song: found / searching / none / private
+        public string lstat { get; set; } = "";   // lyrics for this song: found / searching / plain (untimed only) / none / private
         public int art_id { get; set; } = -1;   // which cover the song has (changes with the song / when its art arrives)
         public string art { get; set; } = "";    // that cover as a base64 JPEG, in about one packet a second
         public double pos { get; set; }          // seconds into the song (for the Now playing screen's bar)

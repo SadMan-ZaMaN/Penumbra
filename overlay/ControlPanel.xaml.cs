@@ -231,6 +231,7 @@ namespace Penumbra
                 "found" => "♪ Lyrics found for this song",
                 "searching" => "Looking for lyrics…",
                 "none" => "No lyrics found for this song",
+                "plain" => "Only untimed lyrics for this song",   // LRCLIB has the words, but not when they're sung
                 "private" => "No lyrics: private windows hide the song's title",
                 _ => "",
             };
