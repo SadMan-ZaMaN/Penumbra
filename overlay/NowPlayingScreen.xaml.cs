@@ -198,6 +198,8 @@ namespace Penumbra
             }
             else Progress.Visibility = Visibility.Hidden;
 
+            LyricsNote.Visibility = _glow.Settings.ShowLyrics && s?.lstat == "plain" ? Visibility.Visible : Visibility.Collapsed;
+
             // play or pause icon: what's happening, unless a click just changed it (the engine confirms within a second)
             bool playing = s?.playing == true;
             if (DateTime.UtcNow > _iconHeld && playing != _playingShown) ShowPlaying(playing);

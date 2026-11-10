@@ -57,6 +57,10 @@
                     </StackPanel>
                 </Border>
 
+                <!-- above the lyrics, only when the song has them without timing -->
+                <TextBlock x:Name="LyricsNote" Canvas.Left="742" Canvas.Top="70" Text="Lyrics without timing"
+                           FontSize="15" FontWeight="SemiBold" Opacity="0.45" Visibility="Collapsed"/>
+
                 <!-- progress: how far into the song, with the time gone and the time left under it -->
                 <Canvas x:Name="Progress" Canvas.Left="220" Canvas.Top="612" Width="360" Height="40" Visibility="Hidden">
                     <Border Canvas.Top="4" Width="360" Height="4" CornerRadius="2" Background="#46FFFFFF"/>

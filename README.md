@@ -107,6 +107,7 @@ A full-screen player: the song's cover and name on a blurred copy of the cover, 
   - **Flow** becomes a scrolling list, like YouTube Music or Spotify: the line being sung fills in word by word, the one just sung sits dimmer above, the next ones wait below, and the list glides up line by line.
   - **Constellation** draws its stars there.
   - **Night sky** fades the blurred background to black, keeping the cover and the stars.
+  - Some songs only have **lyrics without timing** (text with no word or line times). Those show here, in any style, as an evenly dim list marked "Lyrics without timing" that slowly scrolls along with the song's progress. It's a rough guide, not exact timing. The normal on-screen lyrics stay empty for them.
 - Windows only gets a small cover from browsers (120 px from YouTube Music), so while this screen is open, Penumbra looks up a sharp one (1000 px) with Apple's free iTunes search. It only uses a result by the same artist with the same title, and keeps the small cover if there's none.
 - **Under the cover:** a progress bar with the time gone and the time left (click it or drag it to jump within the song), and **previous / play-pause / next** buttons. **Space** plays and pauses too. They control whatever is playing, through Windows' media controls (the same ones your keyboard's media keys use). The lyrics stay on screen while paused, and follow straight away when you jump.
 

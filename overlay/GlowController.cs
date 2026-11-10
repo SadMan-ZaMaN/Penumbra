@@ -38,6 +38,7 @@ namespace Penumbra
 
         public LightState? Last { get; private set; }
         public EngineLink Link => _link;
+        public Settings Settings => _settings;
         public Color Primary => _primary;       // what's on screen right now (for the panel)
         public Color Secondary => _secondary;
 

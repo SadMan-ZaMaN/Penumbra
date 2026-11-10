@@ -119,9 +119,12 @@ class Lyrics:
     @property
     def texts(self):
         """(id, every line's text) for the current song, for the Now playing screen's lyrics list.
-        Empty lines (instrumental breaks) are kept, so the positions match the line index."""
+        Timed: empty lines (instrumental breaks) are kept, so the positions match the line index.
+        Only untimed lyrics (status 'plain'): their lines, without the blank ones."""
         with self._lock:
-            return self._id, [t for _, t in self._lines]
+            if self._lines:
+                return self._id, [t for _, t in self._lines]
+            return self._id, [l.strip() for l in self._plain.splitlines() if l.strip()]
 
     @property
     def status(self):

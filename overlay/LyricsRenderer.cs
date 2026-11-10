@@ -185,7 +185,11 @@ namespace Penumbra
                 }
             }
 
-            bool list = ListMode && style == LyricsStyle.Flow;
+            // a song with only untimed lyrics: on the Now playing screen they show as a still list, whatever the
+            // style (Constellation and Night sky need timing). Songs with timed lyrics are exactly as before.
+            bool untimed = s?.lstat == "plain";
+            bool list = ListMode && (style == LyricsStyle.Flow || untimed);
+            _untimed = list && untimed;
             if (list != _list)   // switching between the list and the usual layouts: start afresh
             {
                 _list = list;
@@ -456,9 +460,20 @@ namespace Penumbra
         {
             EnsureFormats(LyricsStyle.Flow, scale);
             var song = Song != null && s != null && Song.Id == s.lyr_id ? Song : null;   // not an old song's lines
+            if (song != null && song.Id != _blocksFor)
+            {
+                // another song's lines (or its lyrics just arrived): start the list afresh. Otherwise the lines
+                // already made for the last song can stay on as this one's, if it lands on the same line number.
+                FreeBlocks();
+                _blocksFor = song.Id;
+                _blocksWidth = _region.Right - _region.Left;
+                _listIdx = _untimedAt = int.MinValue;
+                _scroll = 0;
+            }
             bool on = show && song != null && song.Lines.Length > 0;
             _listAlpha += ((on ? 1 : 0) - _listAlpha) * (1 - Math.Exp(-(on ? 6 : 4) * dt));
             if (song == null) return;
+            if (_untimed) { UpdateUntimed(s!, song, dt); return; }
 
             int idx = s!.lidx;
             if (idx != _listIdx)
@@ -483,6 +498,70 @@ namespace Penumbra
         }
 
         static readonly int[] NearFirst = { 0, 1, -1, 2, 3, -2, 4, 5, 6, 7, 8, 9, 10 };
+
+        bool _untimed;                 // the list is showing a song's untimed lyrics
+        double _untimedPos;            // ...scrolled to this (fractional) line
+        int _untimedAt = int.MinValue; // ...whose nearby stencils were last tidied for this line
+
+        /// <summary>Untimed lyrics: no line is "being sung", so the list just scrolls smoothly with the song's
+        /// progress (singing usually starts a little after the song does, and ends before it).</summary>
+        void UpdateUntimed(LightState s, SongLyrics song, double dt)
+        {
+            double progress = s.dur > 1 ? Math.Clamp(s.pos / s.dur, 0, 1) : 0;
+            double target = Math.Clamp((progress - 0.05) / 0.85, 0, 1) * Math.Max(0, song.Lines.Length - 1);
+            if (Math.Abs(target - _untimedPos) > 3) _untimedPos = target;            // a seek or a new song: jump
+            else _untimedPos += (target - _untimedPos) * (1 - Math.Exp(-3 * dt));
+            int at = (int)_untimedPos;
+            if (at != _untimedAt)
+            {
+                _untimedAt = at;
+                foreach (var k in new List<int>(_blocks.Keys))
+                    if (k < at - 4 || k > at + 14) { _blocks[k].Dispose(); _blocks.Remove(k); }
+            }
+            int made = 0;                                                               // a few new lines per frame
+            foreach (int k in NearFirst)
+            {
+                int i = at + k;
+                if (i < 0 || i >= song.Lines.Length || _blocks.ContainsKey(i)) continue;
+                Block(i);
+                if (++made == 3) break;
+            }
+        }
+
+        /// <summary>Untimed lyrics: every line evenly dim (nothing pretends to be in time), the list moving up
+        /// smoothly as the song goes on, fading out at the top and the bottom.</summary>
+        void DrawUntimed(ID2D1DeviceContext ctx, Matrix3x2 origin, float a)
+        {
+            float rh = _region.Bottom - _region.Top, gap = ListGap;
+            float Height(Stencil b) => b.H - b.Pad * 2;
+            float Fade(float y, float h) => (float)(Smooth(y / (rh * 0.12)) * Smooth((rh - y - h) / (rh * 0.3)));
+            ctx.Transform = Matrix3x2.Identity;
+            ctx.PushAxisAlignedClip(new RawRectF(_region.Left + Shift.X, _region.Top + Shift.Y,
+                                                 _region.Right + Shift.X, _region.Bottom + Shift.Y), AntialiasMode.Aliased);
+            int i0 = (int)Math.Floor(_untimedPos);
+            float frac = (float)(_untimedPos - i0);
+            float h0 = Made(i0) is Stencil first ? Height(first) : _formatPx * 1.3f;
+            float top = rh * 0.22f - frac * (h0 + gap);   // where line i0 starts
+            const float dim = 0.55f;
+
+            float y = top;
+            for (int i = i0; y < rh && Made(i) is Stencil b; i++)
+            {
+                float h = Height(b);
+                Paint(ctx, b, Matrix3x2.CreateTranslation(0, y) * origin, new Color4(1, 1, 1, dim * Fade(y, h) * a));
+                y += h + gap;
+            }
+            y = top;
+            for (int i = i0 - 1; i >= 0 && Made(i) is Stencil b; i--)
+            {
+                float h = Height(b);
+                y -= gap + h;
+                if (y + h < 0) break;
+                Paint(ctx, b, Matrix3x2.CreateTranslation(0, y) * origin, new Color4(1, 1, 1, dim * Fade(y, h) * a));
+            }
+            ctx.Transform = Matrix3x2.Identity;
+            ctx.PopAxisAlignedClip();
+        }
 
         /// <summary>The list: line <paramref name="i"/> of the song, whole, wrapped to the region's width
         /// (a break shows as ♪). Made on first use, so only call it outside Draw.</summary>
@@ -623,6 +702,7 @@ namespace Penumbra
         {
             float a = (float)_listAlpha;
             if (a <= 0.004f) return;
+            if (_untimed) { DrawUntimed(ctx, origin, a); return; }
             float rh = _region.Bottom - _region.Top, gap = ListGap, rowH = _formatPx * 1.3f;
             float y = rh * 0.22f + (float)_scroll;
             ctx.Transform = Matrix3x2.Identity;
