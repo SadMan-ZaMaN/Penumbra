@@ -88,51 +88,54 @@ class LoopbackSource:
             self.pa.terminate()
 
 
-def default_output_name():
-    import pyaudiowpatch as pyaudio
-    pa = pyaudio.PyAudio()          # fresh instance = fresh device list
-    try:
-        wasapi = pa.get_host_api_info_by_type(pyaudio.paWASAPI)
-        return pa.get_device_info_by_index(wasapi["defaultOutputDevice"])["name"]
-    finally:
-        pa.terminate()
-
-
 class AutoLoopback:
     """LoopbackSource that survives errors and follows the default output device
-    (plugging in headphones, switching to Bluetooth speakers, ...)."""
+    (plugging in headphones, switching to Bluetooth speakers, earbuds dropping out and back...)."""
 
-    # When Bluetooth earbuds drop out and reconnect, the device keeps its name but Windows kills the
-    # old capture, which then delivers nothing, forever. Capture also delivers nothing while nothing
-    # plays, and the two look the same from here, so after this long without audio: reconnect.
+    # When Bluetooth earbuds drop out and reconnect, Windows kills the old capture, which then
+    # delivers nothing, forever. When the output is switched, the old one goes quiet the same way. So
+    # when no audio has arrived for this long although a media session says it's playing: reconnect.
     STALE = 3.0
+    # Capture also delivers nothing while nothing plays at all, and that looks the same from here; then
+    # it only tries now and then (for sound that isn't a media session, like a game).
+    IDLE_RETRY = 30.0
 
     def __init__(self):
         self.src = None
         self.name = "none"
         self.rate = 48000
         self.generation = 0          # bumps whenever the device (and maybe sample rate) changes
+        self.expecting = False       # set by the main loop: a media session says it's playing
         self._lock = threading.Lock()
-        self._last_data = time.monotonic()
+        self._last_data = self._last_try = time.monotonic()
         self._reopen = False
         self._open()
         threading.Thread(target=self._watch, daemon=True).start()
 
     def _open(self):
+        # Shut the old capture down *before* opening the new one. The audio library (PortAudio) only
+        # really starts up, and reads the current devices, when no other copy of it is running; otherwise
+        # it hands back its old device list, with a reconnected Bluetooth device's dead entry in it.
+        # (Measured: a "start" while another copy runs takes 0.0 ms; a real one about 27 ms.)
+        with self._lock:
+            old, self.src = self.src, None
+        if old:
+            try:
+                old.close()
+            except Exception:
+                pass
+        self._last_data = self._last_try = time.monotonic()
         try:
             src = LoopbackSource()
         except Exception as e:
             print(f"[engine] audio capture failed: {e} (retrying)", file=sys.stderr, flush=True)
             return
         with self._lock:
-            old, self.src = self.src, src
+            self.src = src
             changed = (src.name, src.rate) != (self.name, self.rate)
             self.name, self.rate = src.name, src.rate
             if changed:
                 self.generation += 1     # a new device: the beat detector starts over
-            self._last_data = time.monotonic()
-        if old:
-            old.close()
         if changed:
             print(f"[engine] audio: {self.name} @ {self.rate} Hz", flush=True)
 
@@ -141,12 +144,10 @@ class AutoLoopback:
         opens from the thread that opened the first one: from here it fails ("host error")."""
         while True:
             time.sleep(2)
-            try:
-                if (self.src is None or time.monotonic() - self._last_data > self.STALE
-                        or not self.name.startswith(default_output_name())):
-                    self._reopen = True
-            except Exception:
-                pass
+            now = time.monotonic()
+            quiet = now - self._last_data > self.STALE
+            if self.src is None or (quiet and (self.expecting or now - self._last_try > self.IDLE_RETRY)):
+                self._reopen = True
 
     def blocks(self):
         if self._reopen:          # called from the main loop, so this is the right thread to reconnect on
@@ -367,6 +368,8 @@ def main():
                 det.idle(frame)
 
             np_state = media.snapshot()
+            if hasattr(src, "expecting"):    # music is playing: no audio arriving means the capture is dead
+                src.expecting = bool(np_state["playing"])
             if np_state["art_id"] != art_id:
                 art_id = np_state["art_id"]
                 thumb = np_state.get("thumbnail")

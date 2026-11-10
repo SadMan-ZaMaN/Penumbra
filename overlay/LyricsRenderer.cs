@@ -16,8 +16,10 @@ namespace Penumbra
     /// Synced lyrics, drawn with Direct2D / DirectWrite into the glow window on the render thread.
     /// The lyrics only time whole lines, so each word gets a share of the line's estimated singing
     /// time (by its length) and lights up when its turn comes.
-    ///   Flow:          the current line above the taskbar; words go from dim to bright with a soft
-    ///                  colored glow, the word being sung lifts a little, lines slide up and away.
+    ///   Flow:          the current line above the taskbar in Century Gothic, karaoke style: a light
+    ///                  tint of the song's colour fills the soft-white letters as they're sung, over a soft
+    ///                  shadow; lines fade out and in, in place. (On the Now playing screen Flow is a list
+    ///                  instead: Apple Music style, see DrawList.)
     ///   Constellation: each word appears as a star joined to the previous one by a thin line; the
     ///                  word being sung is big and bright, earlier ones shrink and dim.
     ///
@@ -34,7 +36,8 @@ namespace Penumbra
             public float Start, Length;     // share of the line's singing time, 0..1
             public Vector2 Pos;             // Flow: top-left within the line block; Constellation: its star
             public int Row;                 // Flow: which row of the line it's on
-            public Stencil Text = null!, Glow = null!;   // white text, and its blurred glow, at full size
+            public Stencil Text = null!;    // white text, at full size
+            public Stencil? Glow;           // its blur: a glow, or (Flow's karaoke) its shadow
             public Stencil? Small;          // Constellation: the text again at its settled size (sharper than shrinking)
         }
 
@@ -62,6 +65,7 @@ namespace Penumbra
         }
 
         const string Font = "Segoe UI Variable Display";
+        const string KaraokeFont = "Century Gothic";   // Flow's karaoke line (bold); geometric, rounded
         const float Settled = 0.42f;        // Constellation: size of a word once it's been sung, vs. while sung
 
         readonly IDWriteFactory _dw;
@@ -73,16 +77,17 @@ namespace Penumbra
         ID2D1LinearGradientBrush? _wipe;    // Flow: bright white -> dim, slid along the line as it's sung
         ID2D1LinearGradientBrush? _glowWipe;// the same for the glow: glow color -> nothing
         Color4 _glowWipeColor;
+        ID2D1LinearGradientBrush? _fillWipe;// Flow's karaoke fill: its tint -> nothing, with a crisp edge
+        Color4 _fillWipeColor, _fillColor;
         Vortice.Direct2D1.Effects.Shadow? _blur;   // only used while making glow stencils
         Stencil? _dot;                      // soft round glow, for the stars
         IDWriteTextFormat? _format, _settledFormat, _small;
         float _formatPx;
         LyricsStyle _formatStyle;
+        bool _formatList;                   // the formats were made for the Now playing list (a different font)
 
         Line? _current;
         readonly List<Line> _leaving = new();
-        Stencil? _next;                     // Flow: the next line, small and dim
-        float _nextW, _nextH;
         bool _alphaOnly = true;             // text stencils as 1-byte alpha (falls back to full color if the GPU says no)
         float _x0, _y0, _x1, _y1;           // what this frame has drawn so far, px (for Drawn)
         readonly List<(Word w, Vector2 star, float starR, float scale, float a, bool active)> _shown = new();
@@ -212,7 +217,6 @@ namespace Penumbra
                     else { _current.Leaving = 0; _leaving.Add(_current); }
                 }
                 _current = MakeLine(s!.lyric, s.lidx, style, scale);
-                SetNext(list ? "" : s.next, style, scale);
                 _device?.ClearResources(0);   // the line's stencils are made: let Direct2D drop its scratch memory
             }
             else if (!hasLine && _current != null && (list || _alpha < 0.01))
@@ -233,7 +237,7 @@ namespace Penumbra
             {
                 var l = _leaving[i];
                 l.Leaving += dt;
-                if (l.Leaving > (l.Style == LyricsStyle.Flow ? 0.5 : 0.9)) { Free(l); _leaving.RemoveAt(i); }
+                if (l.Leaving > (l.Style == LyricsStyle.Flow ? 0.25 : 0.9)) { Free(l); _leaving.RemoveAt(i); }   // (karaoke fades out in 0.18 s)
             }
         }
 
@@ -245,10 +249,13 @@ namespace Penumbra
             // being sung) and shrink from there.
             // (the Now playing screen's list: a little bigger, like the mockup)
             float px = (float)((_list ? 37 : style == LyricsStyle.Flow ? 34 : 44) * scale);
-            if (_format != null && Math.Abs(px - _formatPx) < 0.5f && style == _formatStyle) return;
+            if (_format != null && Math.Abs(px - _formatPx) < 0.5f && style == _formatStyle && _list == _formatList) return;
             FreeBlocks();   // they're made in this font
             _format?.Dispose(); _settledFormat?.Dispose(); _small?.Dispose();
-            _format = MakeFormat(px, style == LyricsStyle.Flow ? FontWeight.Bold : FontWeight.SemiBold);
+            // Flow (the karaoke line above the taskbar) is in Century Gothic; the rest stays in Segoe UI
+            _format = MakeFormat(px, style == LyricsStyle.Flow ? FontWeight.Bold : FontWeight.SemiBold,
+                                 style == LyricsStyle.Flow && !_list ? KaraokeFont : Font);
+            _formatList = _list;
             _settledFormat = MakeFormat(px * Settled, FontWeight.SemiBold);
             _small = MakeFormat(px * 0.58f, FontWeight.SemiBold);
             _formatPx = px;
@@ -257,8 +264,8 @@ namespace Penumbra
             _dot = null;
         }
 
-        IDWriteTextFormat MakeFormat(float px, FontWeight weight) =>
-            _dw.CreateTextFormat(Font, null, weight, Vortice.DirectWrite.FontStyle.Normal, FontStretch.Normal, px, "en-us");
+        IDWriteTextFormat MakeFormat(float px, FontWeight weight, string family = Font) =>
+            _dw.CreateTextFormat(family, null, weight, Vortice.DirectWrite.FontStyle.Normal, FontStretch.Normal, px, "en-us");
 
         Line MakeLine(string text, int index, LyricsStyle style, double scale)
         {
@@ -272,7 +279,8 @@ namespace Penumbra
             {
                 var word = new Word { Start = at / total, Length = (p.Length + 1) / total };
                 word.Text = MakeTextStencil(p, _format!, 2, out word.W, out word.H);
-                word.Glow = MakeGlowStencil(word.Text, blur);
+                // karaoke: a tighter blur, drawn dark under the word as its shadow (it has no glow)
+                word.Glow = MakeGlowStencil(word.Text, style == LyricsStyle.Flow && !_list ? _formatPx * 0.11f : blur);
                 if (style != LyricsStyle.Flow) word.Small = MakeTextStencil(p, _settledFormat!, 2, out _, out _);
                 line.Words.Add(word);
                 at += p.Length + 1;
@@ -506,15 +514,6 @@ namespace Penumbra
             _blocksFor = int.MinValue;
         }
 
-        void SetNext(string next, LyricsStyle style, double scale)
-        {
-            _next?.Dispose();
-            _next = null;
-            if (style != LyricsStyle.Flow || string.IsNullOrEmpty(next)) return;
-            EnsureFormats(style, scale);
-            _next = MakeTextStencil(next, _small!, 2, out _nextW, out _nextH);
-        }
-
         // ------------------------------------------------------------------ drawing
 
         /// <summary>Where lyrics go for a style, px: Flow above the taskbar, Constellation in the middle.</summary>
@@ -546,6 +545,14 @@ namespace Penumbra
                 _glowWipe = MakeWipe(glow, new Color4(glow.R, glow.G, glow.B, 0));
                 _glowWipeColor = glow;
             }
+            // Flow's karaoke fill: a light tint of the song's colour (the full colour looked loud over apps)
+            _fillColor = new Color4(Mix(glow.R, 1, 0.55f), Mix(glow.G, 1, 0.55f), Mix(glow.B, 1, 0.55f), 1);
+            if (_fillWipe == null || Math.Abs(_fillWipeColor.R - _fillColor.R) + Math.Abs(_fillWipeColor.G - _fillColor.G) + Math.Abs(_fillWipeColor.B - _fillColor.B) > 0.02f)
+            {
+                _fillWipe?.Dispose();
+                _fillWipe = MakeWipe(_fillColor, new Color4(_fillColor.R, _fillColor.G, _fillColor.B, 0));
+                _fillWipeColor = _fillColor;
+            }
 
             ctx.Target = target;
             ctx.BeginDraw();
@@ -558,12 +565,6 @@ namespace Penumbra
                 foreach (var l in _leaving) DrawLine(ctx, l, pass == 0, sung, glow, scale, origin);
                 if (_current != null) DrawLine(ctx, _current, pass == 0, sung, glow, scale, origin);
             }
-            if (!_list && _next != null && _current != null && _current.Style == LyricsStyle.Flow)
-            {
-                float rw = _region.Right - _region.Left, rh = _region.Bottom - _region.Top;
-                Paint(ctx, _next, Matrix3x2.CreateTranslation((rw - _nextW) / 2, rh - _nextH - _formatPx * 0.05f) * origin,
-                      new Color4(1, 1, 1, (float)(Ease(_current.Age / 0.4) * 0.4 * _alpha)));
-            }
             ctx.Transform = Matrix3x2.Identity;
             ctx.AntialiasMode = AntialiasMode.PerPrimitive;
             ctx.EndDraw();
@@ -571,6 +572,49 @@ namespace Penumbra
             // only where something was actually drawn gets wiped and redrawn next frame
             Drawn = _x1 < _x0 ? null : new RawRect((int)Math.Floor(_x0) - 2, (int)Math.Floor(_y0) - 2,
                                                    (int)Math.Ceiling(_x1) + 2, (int)Math.Ceiling(_y1) + 2);
+        }
+
+        /// <summary>Flow, karaoke fill: the line in soft white, and a light tint of the song's colour filling its
+        /// letters left to right as they're sung, with a crisp edge; a soft dark shadow underneath keeps it
+        /// readable over busy windows (no glow). The old line fades out, then the new one fades in, in place.
+        /// Word timing is the same estimate as before (the lyrics only time whole lines).</summary>
+        void DrawKaraoke(ID2D1DeviceContext ctx, Line l, bool shadowPass, double scale, Matrix3x2 origin)
+        {
+            bool leaving = l.Leaving >= 0;
+            double fade = leaving ? 1 - Smooth(l.Leaving / 0.18) : Smooth((l.Age - 0.08) / 0.22);
+            float a = (float)(fade * _alpha);
+            if (a <= 0.004f) return;
+            if (shadowPass)   // all the shadows first, so one never darkens a neighbouring word
+            {                float drop = (float)(1.5 * scale);
+                var shade = new Color4(0, 0, 0, 0.55f * a);
+                foreach (var w in l.Words)
+                    if (w.Glow != null) Paint(ctx, w.Glow, Matrix3x2.CreateTranslation(w.Pos.X, l.BlockTop + w.Pos.Y + drop) * origin, shade);
+                return;
+            }
+            const float unsung = 0.59f;   // soft white: the light tint still stands out from it, even for pale songs
+            var coloured = new Color4(_fillColor.R, _fillColor.G, _fillColor.B, a);
+
+            // how far the fill has got: a row, and a position along it (crossing word gaps smoothly)
+            double sungFrac = leaving ? 1 : l.SungAt / l.SingFor;
+            int fillRow = int.MaxValue; float fillX = 0;
+            if (!leaving)
+                foreach (var w in l.Words)
+                {
+                    double p = (sungFrac - w.Start) / w.Length;
+                    if (p < 1) { fillRow = w.Row; fillX = w.Pos.X + w.W * (float)Math.Max(0, p); break; }
+                }
+            float edge = (float)Math.Max(1, scale);   // just enough softness for a smooth edge, not a blurry one
+
+            foreach (var w in l.Words)
+            {
+                var t = Matrix3x2.CreateTranslation(w.Pos.X, l.BlockTop + w.Pos.Y) * origin;
+                float local = fillX - w.Pos.X;      // the fill's edge, in this word's coordinates
+                bool all = leaving || w.Row < fillRow || (w.Row == fillRow && local - edge >= w.W);
+                bool none = !leaving && (w.Row > fillRow || (w.Row == fillRow && local + edge <= 0));
+                if (all) { Paint(ctx, w.Text, t, coloured); continue; }
+                Paint(ctx, w.Text, t, new Color4(1, 1, 1, unsung * a));
+                if (!none) PaintWipe(ctx, w.Text, t, _fillWipe!, local, edge, a);   // the tint, up to the edge
+            }
         }
 
         /// <summary>The list: the line being sung about a fifth of the way down (word by word, as in Flow),
@@ -665,9 +709,15 @@ namespace Penumbra
         void DrawLine(ID2D1DeviceContext ctx, Line l, bool glowPass, Color4 sung, Color4 glow, double scale, Matrix3x2 origin)
         {
             double sungFrac = l.Leaving >= 0 ? 1 : l.SungAt / l.SingFor;   // how much of the line is sung
+            if (l.Style == LyricsStyle.Flow && !_drawingList)
+            {
+                DrawKaraoke(ctx, l, glowPass, scale, origin);   // (its "glow" pass draws the shadows)
+                return;
+            }
             if (l.Style == LyricsStyle.Flow)
             {
-                // The new line slides up into place; the old one drifts up, blurs and fades away.
+                // The Now playing list's sung line (Apple Music style): a soft sweep from dim to bright, with a
+                // glow on what's been sung. (It doesn't move or fade in: the list glides.)
                 float rowH = _formatPx * 1.3f;
                 bool leaving = l.Leaving >= 0;
                 double inT = Ease(l.Age / 0.45), outT = leaving ? Ease(l.Leaving / 0.5) : 0;
@@ -691,7 +741,7 @@ namespace Penumbra
                     if (leaving)
                     {
                         // blur out: the sharp text fades while its blurred copy shows through
-                        if (glowPass) Paint(ctx, w.Glow, t, new Color4(1, 1, 1, (float)(0.8 * outT * (1 - outT)) * lineAlpha));
+                        if (glowPass) Paint(ctx, w.Glow!, t, new Color4(1, 1, 1, (float)(0.8 * outT * (1 - outT)) * lineAlpha));
                         else Paint(ctx, w.Text, t, new Color4(1, 1, 1, (float)(1 - outT) * lineAlpha));
                         continue;
                     }
@@ -700,8 +750,8 @@ namespace Penumbra
                     bool sungNone = w.Row > wipeRow || (w.Row == wipeRow && local + feather <= 0);
                     if (glowPass)   // a soft glow, only on what's been sung
                     {
-                        if (sungAll) Paint(ctx, w.Glow, t, new Color4(glow.R, glow.G, glow.B, 0.55f * lineAlpha));
-                        else if (!sungNone) PaintWipe(ctx, w.Glow, t, _glowWipe!, local, feather, 0.55f * lineAlpha);
+                        if (sungAll) Paint(ctx, w.Glow!, t, new Color4(glow.R, glow.G, glow.B, 0.55f * lineAlpha));
+                        else if (!sungNone) PaintWipe(ctx, w.Glow!, t, _glowWipe!, local, feather, 0.55f * lineAlpha);
                         continue;
                     }
                     if (sungAll) Paint(ctx, w.Text, t, new Color4(1, 1, 1, lineAlpha));
@@ -738,7 +788,7 @@ namespace Penumbra
                 {
                     Paint(ctx, dot, Matrix3x2.CreateScale(r / 8 * 1.3f) * Matrix3x2.CreateTranslation(at) * origin,   // dot core: 8 px
                           new Color4(glow.R, glow.G, glow.B, a));
-                    Paint(ctx, w.Glow, Matrix3x2.CreateTranslation(0, -w.H * 0.5f) * Matrix3x2.CreateScale(s) * WordAt(at, r, star, origin),
+                    Paint(ctx, w.Glow!, Matrix3x2.CreateTranslation(0, -w.H * 0.5f) * Matrix3x2.CreateScale(s) * WordAt(at, r, star, origin),
                           new Color4(glow.R, glow.G, glow.B, (active ? 1.4f : 0.5f) * a));
                 }
                 return;
@@ -794,7 +844,7 @@ namespace Penumbra
 
         static void Free(Line l)
         {
-            foreach (var w in l.Words) { w.Text.Dispose(); w.Glow.Dispose(); w.Small?.Dispose(); }
+            foreach (var w in l.Words) { w.Text.Dispose(); w.Glow?.Dispose(); w.Small?.Dispose(); }
             l.Words.Clear();
         }
 
@@ -804,11 +854,11 @@ namespace Penumbra
             if (_current != null) { Free(_current); _current = null; }
             foreach (var l in _leaving) Free(l);
             _leaving.Clear();
-            _next?.Dispose(); _next = null;
             FreeBlocks();
             _dot?.Dispose(); _dot = null;
             _wipe?.Dispose(); _wipe = null;
             _glowWipe?.Dispose(); _glowWipe = null;
+            _fillWipe?.Dispose(); _fillWipe = null;
             _blur?.Dispose(); _blur = null;
             _brush?.Dispose(); _brush = null;
         }

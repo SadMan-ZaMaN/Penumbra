@@ -16,7 +16,7 @@ It moves with your music, takes its colors from what you're playing, and can sho
 - **A glow that moves with the music.** A thin, solid line of light hugs the screen edges. Streams of light grow, travel around the edge and fade, with darkness in between. Beats start new streams, and louder music makes them brighter and faster.
 - **Colors that match what's playing.** For music (Spotify, YouTube Music…), the glow takes the dominant color of the album art. For videos (YouTube, VLC…), it follows the colors on screen.
 - **Synced lyrics, three ways:**
-  - **Flow:** one big, bold line above the taskbar that fills in as it's sung, like Apple Music.
+  - **Flow:** one bold line above the taskbar, karaoke style: a light tint of the song's colour fills the letters as they're sung.
   - **Constellation:** each word appears as a star, joined to the last one.
   - **Night sky:** the constellation on a pitch-black screen, with the glow around it.
 - **Stays out of your way.** Clicks go straight through it, it never takes focus, it's hidden from screenshots and screen sharing by default, and it switches itself off when nothing is playing.
