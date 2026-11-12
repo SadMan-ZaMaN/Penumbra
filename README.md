@@ -91,6 +91,7 @@ Then play something: Spotify, YouTube in a browser, or any app that shows up in 
 | **Show in screenshots & recordings** | Off by default. Turn it on to record the glow. |
 | **OLED care** | On by default. Slowly moves the glow and lyrics a few pixels inward and back over 15 minutes, too slow to see, so the same pixels don't take all the wear. |
 | **↻** | Resets the look (colors, sizes, corners, motion) to the defaults, and switches lyrics off (back to Flow). |
+| **⟳** (beside it) | Restarts Penumbra: closes it and its engine, and starts both again, with the panel open. Your settings stay. Handy if the light or lyrics ever get stuck. |
 
 ### Night sky
 
@@ -203,7 +204,7 @@ setup.bat · run.bat · stop.bat · debug.bat
 ## For developers
 
 - **`debug.bat`** runs the engine in a console with live readouts: level, BPM, music or video, colors and where they came from, title and lyric line. **`debug.bat --demo`** adds a fake 120 BPM beat and made-up lyrics.
-- **`Penumbra.exe --black`** draws on black instead of see-through, to judge the look. **`--no-engine`** skips starting the engine (run your own), **`--panel`** opens the panel at start-up, and **`--test-freeze`** hangs the glow during Night sky, to test the safety net.
+- **`Penumbra.exe --black`** draws on black instead of see-through, to judge the look. **`--no-engine`** skips starting the engine (run your own), **`--panel`** opens the panel at start-up (**`--restart-after <pid>`**, used by the restart button, waits for the old copy to close first), and **`--test-freeze`** hangs the glow during Night sky, to test the safety net.
 - **Building:** `dotnet build overlay -c Release` (close Penumbra first, since the running `.exe` is locked). The shader is compiled when the app starts, so shader mistakes show up then, not at build time.
 - **Tuning the feel:**
   - Beat sensitivity: `thresh` in `dsp.py`

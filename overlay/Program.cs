@@ -8,9 +8,21 @@ namespace Penumbra
 {
     public static class Program
     {
+        static string[] _args = Array.Empty<string>();
+        static Action? _quit;
+
         [STAThread]
         public static void Main(string[] args)
         {
+            // started by Restart: let the old copy finish closing first (it still holds the single-instance
+            // lock, the UDP port and the engine)
+            int r = Array.IndexOf(args, "--restart-after");
+            if (r >= 0 && r + 1 < args.Length && int.TryParse(args[r + 1], out int oldPid))
+            {
+                try { using var old = Process.GetProcessById(oldPid); old.WaitForExit(10_000); }
+                catch { /* already gone */ }
+            }
+
             using var openPanel = new EventWaitHandle(false, EventResetMode.AutoReset, "Penumbra.OpenPanel");
             using var single = new Mutex(true, "Penumbra.SingleInstance", out bool first);
             if (!first)
@@ -45,7 +57,9 @@ namespace Penumbra
             var glow = new GlowController(settings, link);
             var window = new GlowWindow(settings, glow, black: args.Contains("--black"), testFreeze: args.Contains("--test-freeze"));
             Tray? tray = null;
-            tray = new Tray(settings, glow, link, () => { ControlPanel.Quitting = true; app.Shutdown(); });
+            _args = args;
+            _quit = () => { ControlPanel.Quitting = true; app.Shutdown(); };
+            tray = new Tray(settings, glow, link, _quit);
             if (engineError != null)
                 tray.Notify("Penumbra: engine not started", engineError);
             if (args.Contains("--panel")) tray.OpenPanel();
@@ -104,6 +118,25 @@ namespace Penumbra
                 settings.Save();
             };
             app.Run();
+        }
+
+        /// <summary>The panel's restart button: start a fresh copy (same options, panel open so you can see it's
+        /// back), then close this one, engine and all. Settings are saved on the way out and read again.</summary>
+        public static void Restart()
+        {
+            var psi = new ProcessStartInfo(Environment.ProcessPath!) { UseShellExecute = false };
+            for (int i = 0; i < _args.Length; i++)
+            {
+                if (_args[i] == "--restart-after") { i++; continue; }   // (and the old copy's number)
+                if (_args[i] != "--panel") psi.ArgumentList.Add(_args[i]);
+            }
+            psi.ArgumentList.Add("--panel");
+            psi.ArgumentList.Add("--restart-after");
+            psi.ArgumentList.Add(Environment.ProcessId.ToString());
+            Native.LetAnyAppComeToFront();   // the new copy may bring its panel to the front
+            try { Process.Start(psi); }
+            catch { return; }                // couldn't start one: better to keep running than just quit
+            _quit?.Invoke();
         }
     }
 }

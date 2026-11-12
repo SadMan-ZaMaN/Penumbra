@@ -85,6 +85,7 @@ namespace Penumbra
             PrimarySwatch.Click += (_, _) => Pick(true);
             SecondarySwatch.Click += (_, _) => Pick(false);
             Quit.Click += (_, _) => quit();
+            Restart.Click += (_, _) => Program.Restart();
             Reset.Click += (_, _) => { _s.ResetLook(); Load(); Set(() => { }); };
 
             foreach (var (name, a, b) in PresetColors)
